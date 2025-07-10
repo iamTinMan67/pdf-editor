@@ -55,8 +55,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
   // Elements that belong to the current page
   const currentSignatures = signatures.filter(sig => sig.page === currentPage);
   const currentImages = images.filter(img => img.page === currentPage);
-  // Page numbers should appear on all pages if page is 1 (global) or match current page
-  const currentPageNumbers = pageNumbers.filter(num => num.page === 1 || num.page === currentPage);
+  // Page numbers with page 0 appear on all pages, others only on their specific page
+  const currentPageNumbers = pageNumbers.filter(num => num.page === 0 || num.page === currentPage);
 
   // Center the page initially
   useEffect(() => {
