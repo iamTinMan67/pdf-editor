@@ -35,6 +35,7 @@ interface DocumentStoreActions {
   addPage: (afterPageIndex: number) => void;
   reorderPages: (fromIndex: number, toIndex: number) => void;
   setCurrentPage: (page: number) => void;
+  setTotalPages: (pages: number) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -355,6 +356,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
 
   setCurrentPage: (page) => {
     set({ currentPage: page });
+  },
+
+  setTotalPages: (pages) => {
+    set({ totalPages: pages });
   },
 
   undo: () => {
