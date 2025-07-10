@@ -78,17 +78,6 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     // Create a new ArrayBuffer copy to prevent detachment issues
     const newBuffer = file.slice(0);
     
-    // Get the actual number of pages from the PDF
-    const getPageCount = async () => {
-      try {
-        const pdfDoc = await PDFDocument.load(newBuffer.slice(0));
-        return pdfDoc.getPageCount();
-      } catch (error) {
-        console.error('Error getting page count:', error);
-        return 1;
-      }
-    };
-    
     set({
       currentDocument: { name, file: newBuffer },
       signatures: [],
@@ -96,15 +85,23 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       pageNumbers: [],
       history: [],
       currentHistoryIndex: -1,
+      totalPages: 1, // Will be updated after loading
       currentPage: 1,
       canUndo: false,
       canRedo: false
     });
     
-    // Set the actual page count
-    getPageCount().then(pageCount => {
-      set({ totalPages: pageCount });
-    });
+    // Get the actual number of pages from the PDF
+    (async () => {
+      try {
+        const pdfDoc = await PDFDocument.load(newBuffer.slice(0));
+        const pageCount = pdfDoc.getPageCount();
+        set({ totalPages: pageCount });
+      } catch (error) {
+        console.error('Error getting page count:', error);
+        set({ totalPages: 1 });
+      }
+    })();
     
     get().saveToHistory();
     showToast(`Loaded document: ${name}`, 'success');
@@ -168,19 +165,38 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
 
       // Process page numbers
       for (const pageNum of state.pageNumbers) {
-        const page = pages[pageNum.page - 1];
-        const { width, height } = page.getSize();
-        
-        const text = pageNum.template
-          .replace('{page}', (pageNum.page + pageNum.startingNumber - 1).toString())
-          .replace('{total}', state.totalPages.toString());
-        
-        page.drawText(text, {
-          x: (pageNum.position.x / 595) * width,
-          y: height - ((pageNum.position.y / 842) * height),
-          size: 12,
-          color: rgb(0, 0, 0),
-        });
+        if (pageNum.page === 0) {
+          // Apply to all pages
+          pages.forEach((page, index) => {
+            const { width, height } = page.getSize();
+            const text = pageNum.template
+              .replace('{page}', (index + pageNum.startingNumber).toString())
+              .replace('{total}', state.totalPages.toString());
+            
+            page.drawText(text, {
+              x: (pageNum.position.x / 595) * width,
+              y: height - ((pageNum.position.y / 842) * height),
+              size: 12,
+              color: rgb(0, 0, 0),
+            });
+          });
+        } else {
+          // Apply to specific page
+          const page = pages[pageNum.page - 1];
+          if (page) {
+            const { width, height } = page.getSize();
+            const text = pageNum.template
+              .replace('{page}', (pageNum.page + pageNum.startingNumber - 1).toString())
+              .replace('{total}', state.totalPages.toString());
+            
+            page.drawText(text, {
+              x: (pageNum.position.x / 595) * width,
+              y: height - ((pageNum.position.y / 842) * height),
+              size: 12,
+              color: rgb(0, 0, 0),
+            });
+          }
+        }
       }
 
       // Save the PDF

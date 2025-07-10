@@ -62,7 +62,7 @@ const PageNumberPanel: React.FC = () => {
     addPageNumber({
       id: `pagenum-${Date.now()}`,
       template,
-      page: 1, // This will be applied to all pages
+      page: 0, // Use 0 to indicate it should appear on all pages
       position: { x, y },
       startingNumber,
       alignment: position.includes('left') ? 'left' : position.includes('right') ? 'right' : 'center'
