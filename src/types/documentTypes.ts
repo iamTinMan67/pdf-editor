@@ -14,6 +14,9 @@ export interface TextStyle {
   color: string;
   bold: boolean;
   italic: boolean;
+  rotation?: number;
+  skewX?: number;
+  skewY?: number;
 }
 
 export interface SignatureType {
@@ -44,6 +47,9 @@ export interface PageNumberType {
   startingNumber: number;
   alignment?: 'left' | 'center' | 'right';
   fontSize?: number;
+  rotation?: number;
+  skewX?: number;
+  skewY?: number;
 }
 
 export interface DocumentState {

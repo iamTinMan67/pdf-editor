@@ -138,11 +138,18 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           });
         } else if (sig.type === 'text' && sig.text) {
           // For text signatures, add text
+          const rotation = sig.textStyle?.rotation || 0;
+          const skewX = sig.textStyle?.skewX || 0;
+          
           page.drawText(sig.text, {
             x: (sig.position.x / 595) * width,
             y: height - ((sig.position.y / 842) * height),
             size: sig.textStyle?.fontSize || 12,
             color: rgb(0, 0, 0),
+            rotate: {
+              type: 'degrees',
+              angle: rotation,
+            },
           });
         }
       }
