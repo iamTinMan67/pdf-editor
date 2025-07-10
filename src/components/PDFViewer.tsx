@@ -108,7 +108,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
         <div className="relative inline-block shadow-xl">
           {currentDocument ? (
             <Document
-              file={currentDocument.file}
+              file={currentDocument.file.slice(0)}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
               className="pdf-document"
