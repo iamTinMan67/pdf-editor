@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, AlignLeft, AlignCenter, AlignRight, Hash } from 'lucide-react';
+import { Plus, AlignLeft, AlignCenter, AlignRight, Hash, X } from 'lucide-react';
 import { useDocumentStore } from '../../store/documentStore';
 
 type PageNumberFormat = 'numeric' | 'page-of-total' | 'custom';
@@ -11,7 +11,7 @@ const PageNumberPanel: React.FC = () => {
   const [customFormat, setCustomFormat] = useState<string>('Page {page}');
   const [startingNumber, setStartingNumber] = useState<number>(1);
   
-  const { addPageNumber } = useDocumentStore();
+  const { addPageNumber, pageNumbers, removePageNumber } = useDocumentStore();
 
   const handleAddPageNumbers = () => {
     let template = '';
@@ -140,6 +140,35 @@ const PageNumberPanel: React.FC = () => {
         <Plus className="h-4 w-4 mr-2" />
         Add Page Numbers
       </button>
+      
+      {pageNumbers.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-sm font-medium text-slate-700 mb-2">Added Page Numbers</h3>
+          <div className="space-y-2">
+            {pageNumbers.map((pageNum) => (
+              <div 
+                key={pageNum.id}
+                className="flex items-center justify-between p-2 bg-slate-50 rounded-md"
+              >
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-700">
+                    {pageNum.template.replace('{page}', '1').replace('{total}', 'X')}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Starting from page {pageNum.startingNumber}
+                  </p>
+                </div>
+                <button
+                  onClick={() => removePageNumber(pageNum.id)}
+                  className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

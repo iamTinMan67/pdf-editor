@@ -78,6 +78,17 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     // Create a new ArrayBuffer copy to prevent detachment issues
     const newBuffer = file.slice(0);
     
+    // Get the actual number of pages from the PDF
+    const getPageCount = async () => {
+      try {
+        const pdfDoc = await PDFDocument.load(newBuffer.slice(0));
+        return pdfDoc.getPageCount();
+      } catch (error) {
+        console.error('Error getting page count:', error);
+        return 1;
+      }
+    };
+    
     set({
       currentDocument: { name, file: newBuffer },
       signatures: [],
@@ -85,10 +96,14 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       pageNumbers: [],
       history: [],
       currentHistoryIndex: -1,
-      totalPages: 10,
       currentPage: 1,
       canUndo: false,
       canRedo: false
+    });
+    
+    // Set the actual page count
+    getPageCount().then(pageCount => {
+      set({ totalPages: pageCount });
     });
     
     get().saveToHistory();
