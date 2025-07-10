@@ -18,12 +18,20 @@ interface PDFViewerProps {
 const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
   const { currentDocument, signatures, images, pageNumbers, currentPage, setCurrentPage } = useDocumentStore();
   const [numPages, setNumPages] = useState<number | null>(null);
+  const [isDocumentLoaded, setIsDocumentLoaded] = useState<boolean>(false);
   const [scale, setScale] = useState<number>(1.2);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
+    setIsDocumentLoaded(true);
     setCurrentPage(1);
+  };
+
+  const onDocumentLoadError = (error: Error) => {
+    console.error('Error loading PDF:', error);
+    setIsDocumentLoaded(false);
+    setNumPages(null);
   };
 
   const changePage = (offset: number) => {
@@ -102,48 +110,51 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
             <Document
               file={currentDocument.file}
               onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={onDocumentLoadError}
               className="pdf-document"
             >
-              <div className="relative">
-                <Page
-                  pageNumber={currentPage}
-                  scale={scale}
-                  className="bg-white"
-                  renderAnnotationLayer={false}
-                />
-                
-                {/* Overlays for editing elements */}
-                <div className="absolute inset-0 pointer-events-none">
-                  {/* Render signatures */}
-                  {currentSignatures.map((sig) => (
-                    <Signature
-                      key={sig.id}
-                      signature={sig}
-                      editable={activeToolPanel === 'signature'}
-                    />
-                  ))}
+              {isDocumentLoaded && numPages && (
+                <div className="relative">
+                  <Page
+                    pageNumber={currentPage}
+                    scale={scale}
+                    className="bg-white"
+                    renderAnnotationLayer={false}
+                  />
                   
-                  {/* Render images */}
-                  {currentImages.map((img) => (
-                    <ImageElement
-                      key={img.id}
-                      image={img}
-                      editable={activeToolPanel === 'image'}
-                    />
-                  ))}
-                  
-                  {/* Render page numbers */}
-                  {currentPageNumbers.map((pageNum) => (
-                    <PageNumber
-                      key={pageNum.id}
-                      pageNumber={pageNum}
-                      currentPage={currentPage}
-                      totalPages={numPages || 0}
-                      editable={activeToolPanel === 'pageNumber'}
-                    />
-                  ))}
+                  {/* Overlays for editing elements */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    {/* Render signatures */}
+                    {currentSignatures.map((sig) => (
+                      <Signature
+                        key={sig.id}
+                        signature={sig}
+                        editable={activeToolPanel === 'signature'}
+                      />
+                    ))}
+                    
+                    {/* Render images */}
+                    {currentImages.map((img) => (
+                      <ImageElement
+                        key={img.id}
+                        image={img}
+                        editable={activeToolPanel === 'image'}
+                      />
+                    ))}
+                    
+                    {/* Render page numbers */}
+                    {currentPageNumbers.map((pageNum) => (
+                      <PageNumber
+                        key={pageNum.id}
+                        pageNumber={pageNum}
+                        currentPage={currentPage}
+                        totalPages={numPages || 0}
+                        editable={activeToolPanel === 'pageNumber'}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </Document>
           ) : (
             <div className="flex items-center justify-center bg-white h-[842px] w-[595px]">
