@@ -16,16 +16,13 @@ interface PDFViewerProps {
 }
 
 const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
-  const { currentDocument, signatures, images, pageNumbers, setCurrentPage } = useDocumentStore();
+  const { currentDocument, signatures, images, pageNumbers, currentPage, setCurrentPage } = useDocumentStore();
   const [numPages, setNumPages] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.2);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    setCurrentPage(1);
-    // Update the store's current page and total pages
     setCurrentPage(1);
   };
 
@@ -34,15 +31,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
     const newPage = currentPage + offset;
     if (newPage >= 1 && newPage <= numPages) {
       setCurrentPage(newPage);
-      // Update the store's current page
-      setCurrentPage(newPage);
     }
   };
-
-  // Update store when local page changes
-  useEffect(() => {
-    setCurrentPage(currentPage);
-  }, [currentPage, setCurrentPage]);
 
   const zoomIn = () => {
     setScale((prev) => Math.min(prev + 0.2, 3));
