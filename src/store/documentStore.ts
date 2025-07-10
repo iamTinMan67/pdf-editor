@@ -176,7 +176,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             page.drawText(text, {
               x: (pageNum.position.x / 595) * width,
               y: height - ((pageNum.position.y / 842) * height),
-              size: 12,
+              size: pageNum.fontSize || 12,
               color: rgb(0, 0, 0),
             });
           });
@@ -192,7 +192,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             page.drawText(text, {
               x: (pageNum.position.x / 595) * width,
               y: height - ((pageNum.position.y / 842) * height),
-              size: 12,
+              size: pageNum.fontSize || 12,
               color: rgb(0, 0, 0),
             });
           }

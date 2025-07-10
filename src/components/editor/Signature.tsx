@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Move, X } from 'lucide-react';
+import { Move, X, Maximize2 } from 'lucide-react';
 import { useDocumentStore } from '../../store/documentStore';
 import { SignatureType } from '../../types/documentTypes';
 
@@ -10,7 +10,9 @@ interface SignatureProps {
 
 const Signature: React.FC<SignatureProps> = ({ signature, editable }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [resizeStart, setResizeStart] = useState({ width: 0, height: 0, x: 0, y: 0 });
   const { updateSignature, removeSignature } = useDocumentStore();
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -37,6 +39,45 @@ const Signature: React.FC<SignatureProps> = ({ signature, editable }) => {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    setIsResizing(false);
+  };
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    if (!editable) return;
+    setIsResizing(true);
+    setResizeStart({
+      width: signature.size.width,
+      height: signature.size.height,
+      x: e.clientX,
+      y: e.clientY
+    });
+    e.stopPropagation();
+    e.preventDefault();
+  };
+
+  const handleResizeMove = (e: React.MouseEvent) => {
+    if (!isResizing || !editable) return;
+    
+    const deltaX = e.clientX - resizeStart.x;
+    const deltaY = e.clientY - resizeStart.y;
+    
+    // For signatures, maintain aspect ratio
+    const aspectRatio = resizeStart.width / resizeStart.height;
+    let newWidth = resizeStart.width + deltaX;
+    let newHeight = newWidth / aspectRatio;
+    
+    // Enforce minimum size
+    newWidth = Math.max(50, newWidth);
+    newHeight = Math.max(30, newHeight);
+    
+    updateSignature({
+      ...signature,
+      size: {
+        width: newWidth,
+        height: newHeight
+      }
+    });
+    e.preventDefault();
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -55,6 +96,17 @@ const Signature: React.FC<SignatureProps> = ({ signature, editable }) => {
     }
   }, [isDragging]);
 
+  React.useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove as any);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove as any);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizing]);
+
   return (
     <div
       className={`absolute pointer-events-auto ${editable ? 'cursor-move' : ''}`}
@@ -63,7 +115,7 @@ const Signature: React.FC<SignatureProps> = ({ signature, editable }) => {
         top: `${signature.position.y}px`,
         width: `${signature.size.width}px`,
         height: `${signature.size.height}px`,
-        zIndex: isDragging ? 100 : 10
+        zIndex: isDragging || isResizing ? 100 : 10
       }}
       onMouseDown={handleMouseDown}
     >
@@ -99,6 +151,12 @@ const Signature: React.FC<SignatureProps> = ({ signature, editable }) => {
           >
             <X className="h-3 w-3 text-red-600" />
           </button>
+          <div 
+            className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow-md cursor-se-resize border border-slate-200"
+            onMouseDown={handleResizeStart}
+          >
+            <Maximize2 className="h-3 w-3 text-blue-600" />
+          </div>
           <div className="absolute inset-0 border-2 border-blue-400 border-dashed rounded pointer-events-none"></div>
         </>
       )}

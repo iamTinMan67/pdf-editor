@@ -43,6 +43,7 @@ export interface PageNumberType {
   position: Position;
   startingNumber: number;
   alignment?: 'left' | 'center' | 'right';
+  fontSize?: number;
 }
 
 export interface DocumentState {
