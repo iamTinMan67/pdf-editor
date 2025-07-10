@@ -183,15 +183,21 @@ const PageNumber: React.FC<PageNumberProps> = ({
       style={{
         left: `${pageNumber.position.x}px`,
         top: `${pageNumber.position.y}px`,
-        transform: getTransform(),
-        transformOrigin: 'center center',
         zIndex: isDragging || isResizing || isSkewing ? 100 : 10,
-        textAlign,
-        fontSize: `${pageNumber.fontSize || 12}px`
+        minWidth: '60px',
+        minHeight: '30px'
       }}
       onMouseDown={handleMouseDown}
     >
-      <div className="px-2 py-1 font-medium">
+      <div 
+        className="px-2 py-1 font-medium inline-block"
+        style={{
+          transform: getTransform(),
+          transformOrigin: 'center center',
+          textAlign,
+          fontSize: `${pageNumber.fontSize || 12}px`
+        }}
+      >
         {formattedPageNumber}
       </div>
       
