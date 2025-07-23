@@ -35,6 +35,7 @@ interface DocumentStoreActions {
   addPage: (afterPageIndex: number) => void;
   reorderPages: (fromIndex: number, toIndex: number) => void;
   setCurrentPage: (page: number) => void;
+  setTotalPages: (pages: number) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -85,11 +86,23 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       pageNumbers: [],
       history: [],
       currentHistoryIndex: -1,
-      totalPages: 10,
+      totalPages: 1, // Will be updated after loading
       currentPage: 1,
       canUndo: false,
       canRedo: false
     });
+    
+    // Get the actual number of pages from the PDF
+    (async () => {
+      try {
+        const pdfDoc = await PDFDocument.load(newBuffer.slice(0));
+        const pageCount = pdfDoc.getPageCount();
+        set({ totalPages: pageCount });
+      } catch (error) {
+        console.error('Error getting page count:', error);
+        set({ totalPages: 1 });
+      }
+    })();
     
     get().saveToHistory();
     showToast(`Loaded document: ${name}`, 'success');
@@ -110,26 +123,50 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
 
       // Process signatures
       for (const sig of state.signatures) {
-        const page = pages[sig.page - 1];
+        const pageIndex = sig.page - 1;
+        if (pageIndex < 0 || pageIndex >= pages.length) continue;
+        
+        const page = pages[pageIndex];
         const { width, height } = page.getSize();
 
         if (sig.type === 'drawn' && sig.dataURL) {
           // For drawn signatures, embed the image
-          const imageData = sig.dataURL.split(',')[1];
-          const signatureImage = await pdfDoc.embedPng(Buffer.from(imageData, 'base64'));
+          try {
+            const imageData = sig.dataURL.split(',')[1];
+            const imageBytes = Uint8Array.from(atob(imageData), c => c.charCodeAt(0));
+            
+            let signatureImage;
+            if (sig.dataURL.startsWith('data:image/png')) {
+              signatureImage = await pdfDoc.embedPng(imageBytes);
+            } else {
+              signatureImage = await pdfDoc.embedJpg(imageBytes);
+            }
           
-          page.drawImage(signatureImage, {
-            x: (sig.position.x / 595) * width,
-            y: height - ((sig.position.y / 842) * height),
-            width: (sig.size.width / 595) * width,
-            height: (sig.size.height / 842) * height,
-          });
+            // Convert from screen coordinates to PDF coordinates
+            const pdfX = sig.position.x * (width / 595);
+            const pdfY = height - (sig.position.y * (height / 842)) - (sig.size.height * (height / 842));
+            const pdfWidth = sig.size.width * (width / 595);
+            const pdfHeight = sig.size.height * (height / 842);
+            
+            page.drawImage(signatureImage, {
+              x: pdfX,
+              y: pdfY,
+              width: pdfWidth,
+              height: pdfHeight,
+            });
+          } catch (error) {
+            console.error('Error embedding signature image:', error);
+          }
         } else if (sig.type === 'text' && sig.text) {
           // For text signatures, add text
+          const fontSize = (sig.textStyle?.fontSize || 32) * (width / 595);
+          const pdfX = sig.position.x * (width / 595);
+          const pdfY = height - (sig.position.y * (height / 842));
+          
           page.drawText(sig.text, {
-            x: (sig.position.x / 595) * width,
-            y: height - ((sig.position.y / 842) * height),
-            size: sig.textStyle?.fontSize || 12,
+            x: pdfX,
+            y: pdfY,
+            size: fontSize,
             color: rgb(0, 0, 0),
           });
         }
@@ -137,35 +174,83 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
 
       // Process images
       for (const img of state.images) {
-        const page = pages[img.page - 1];
+        const pageIndex = img.page - 1;
+        if (pageIndex < 0 || pageIndex >= pages.length) continue;
+        
+        const page = pages[pageIndex];
         const { width, height } = page.getSize();
         
-        const imageData = img.dataURL.split(',')[1];
-        const embedImage = await pdfDoc.embedPng(Buffer.from(imageData, 'base64'));
-        
-        page.drawImage(embedImage, {
-          x: (img.position.x / 595) * width,
-          y: height - ((img.position.y / 842) * height),
-          width: (img.size.width / 595) * width,
-          height: (img.size.height / 842) * height,
-        });
+        try {
+          const imageData = img.dataURL.split(',')[1];
+          const imageBytes = Uint8Array.from(atob(imageData), c => c.charCodeAt(0));
+          
+          let embedImage;
+          if (img.dataURL.startsWith('data:image/png')) {
+            embedImage = await pdfDoc.embedPng(imageBytes);
+          } else {
+            embedImage = await pdfDoc.embedJpg(imageBytes);
+          }
+          
+          // Convert from screen coordinates to PDF coordinates
+          const pdfX = img.position.x * (width / 595);
+          const pdfY = height - (img.position.y * (height / 842)) - (img.size.height * (height / 842));
+          const pdfWidth = img.size.width * (width / 595);
+          const pdfHeight = img.size.height * (height / 842);
+          
+          page.drawImage(embedImage, {
+            x: pdfX,
+            y: pdfY,
+            width: pdfWidth,
+            height: pdfHeight,
+          });
+        } catch (error) {
+          console.error('Error embedding image:', error);
+        }
       }
 
       // Process page numbers
       for (const pageNum of state.pageNumbers) {
-        const page = pages[pageNum.page - 1];
-        const { width, height } = page.getSize();
-        
-        const text = pageNum.template
-          .replace('{page}', (pageNum.page + pageNum.startingNumber - 1).toString())
-          .replace('{total}', state.totalPages.toString());
-        
-        page.drawText(text, {
-          x: (pageNum.position.x / 595) * width,
-          y: height - ((pageNum.position.y / 842) * height),
-          size: 12,
-          color: rgb(0, 0, 0),
-        });
+        if (pageNum.page === 0) {
+          // Apply to all pages
+          pages.forEach((page, index) => {
+            const { width, height } = page.getSize();
+            const fontSize = (pageNum.fontSize || 12) * (width / 595);
+            const pdfX = pageNum.position.x * (width / 595);
+            const pdfY = height - (pageNum.position.y * (height / 842));
+            
+            const text = pageNum.template
+              .replace('{page}', (index + pageNum.startingNumber).toString())
+              .replace('{total}', state.totalPages.toString());
+            
+            page.drawText(text, {
+              x: pdfX,
+              y: pdfY,
+              size: fontSize,
+              color: rgb(0, 0, 0),
+            });
+          });
+        } else {
+          // Apply to specific page
+          const pageIndex = pageNum.page - 1;
+          if (pageIndex >= 0 && pageIndex < pages.length) {
+            const page = pages[pageIndex];
+            const { width, height } = page.getSize();
+            const fontSize = (pageNum.fontSize || 12) * (width / 595);
+            const pdfX = pageNum.position.x * (width / 595);
+            const pdfY = height - (pageNum.position.y * (height / 842));
+            
+            const text = pageNum.template
+              .replace('{page}', (pageNum.page + pageNum.startingNumber - 1).toString())
+              .replace('{total}', state.totalPages.toString());
+            
+            page.drawText(text, {
+              x: pdfX,
+              y: pdfY,
+              size: fontSize,
+              color: rgb(0, 0, 0),
+            });
+          }
+        }
       }
 
       // Save the PDF
@@ -317,6 +402,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
 
   setCurrentPage: (page) => {
     set({ currentPage: page });
+  },
+
+  setTotalPages: (pages) => {
+    set({ totalPages: pages });
   },
 
   undo: () => {

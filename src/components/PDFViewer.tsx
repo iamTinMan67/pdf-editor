@@ -16,23 +16,45 @@ interface PDFViewerProps {
 }
 
 const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
-  const { currentDocument, signatures, images, pageNumbers } = useDocumentStore();
+  const { currentDocument, signatures, images, pageNumbers, currentPage, setCurrentPage, totalPages } = useDocumentStore();
   const [numPages, setNumPages] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.2);
+  const [documentData, setDocumentData] = useState<ArrayBuffer | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Update document data when currentDocument changes
+  useEffect(() => {
+    if (currentDocument?.file) {
+      // Create a fresh copy of the ArrayBuffer for react-pdf
+      const newBuffer = currentDocument.file.slice(0);
+      setDocumentData(newBuffer);
+    } else {
+      setDocumentData(null);
+    }
+  }, [currentDocument]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    setCurrentPage(1);
+    // Update the store with the actual page count
+    const store = useDocumentStore.getState();
+    store.setTotalPages(numPages);
+    if (currentPage > numPages) {
+      setCurrentPage(1);
+    }
+  };
+
+  const onDocumentLoadError = (error: Error) => {
+    console.error('Error loading PDF:', error);
+    setNumPages(null);
+    setDocumentData(null);
   };
 
   const changePage = (offset: number) => {
     if (!numPages) return;
-    setCurrentPage((prevPage) => {
-      const newPage = prevPage + offset;
-      return newPage >= 1 && newPage <= numPages ? newPage : prevPage;
-    });
+    const newPage = currentPage + offset;
+    if (newPage >= 1 && newPage <= numPages) {
+      setCurrentPage(newPage);
+    }
   };
 
   const zoomIn = () => {
@@ -46,7 +68,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
   // Elements that belong to the current page
   const currentSignatures = signatures.filter(sig => sig.page === currentPage);
   const currentImages = images.filter(img => img.page === currentPage);
-  const currentPageNumbers = pageNumbers.filter(num => num.page === currentPage);
+  // Page numbers with page 0 appear on all pages, others only on their specific page
+  const currentPageNumbers = pageNumbers.filter(num => num.page === 0 || num.page === currentPage);
 
   // Center the page initially
   useEffect(() => {
@@ -61,19 +84,19 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
       <div className="bg-white border-b border-slate-200 p-2 flex justify-between items-center">
         <div className="flex items-center space-x-1">
           <button
-            className={`p-1 rounded-md ${currentPage <= 1 ? 'text-slate-300' : 'text-slate-700 hover:bg-slate-100'}`}
+            className={`p-1 rounded-md ${currentPage <= 1 || !numPages ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-100'}`}
             onClick={() => changePage(-1)}
-            disabled={currentPage <= 1}
+            disabled={currentPage <= 1 || !numPages}
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <span className="text-sm">
-            Page {currentPage} of {numPages || '?'}
+            Page {currentPage} of {numPages || totalPages || '?'}
           </span>
           <button
-            className={`p-1 rounded-md ${currentPage >= (numPages || 0) ? 'text-slate-300' : 'text-slate-700 hover:bg-slate-100'}`}
+            className={`p-1 rounded-md ${currentPage >= (numPages || totalPages || 0) || !numPages ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-100'}`}
             onClick={() => changePage(1)}
-            disabled={currentPage >= (numPages || 0)}
+            disabled={currentPage >= (numPages || totalPages || 0) || !numPages}
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -98,18 +121,40 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
       {/* PDF Document and Overlay */}
       <div className="flex-1 overflow-auto flex justify-center bg-slate-200 p-8">
         <div className="relative inline-block shadow-xl">
-          {currentDocument ? (
+          {documentData ? (
             <Document
-              file={currentDocument.file}
+              file={documentData}
               onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={onDocumentLoadError}
               className="pdf-document"
+              loading={
+                <div className="flex items-center justify-center bg-white h-[842px] w-[595px] border">
+                  <p className="text-slate-400">Loading PDF...</p>
+                </div>
+              }
+              error={
+                <div className="flex items-center justify-center bg-white h-[842px] w-[595px] border">
+                  <p className="text-red-500">Error loading PDF</p>
+                </div>
+              }
             >
               <div className="relative">
                 <Page
                   pageNumber={currentPage}
                   scale={scale}
-                  className="bg-white"
+                  className="bg-white border"
                   renderAnnotationLayer={false}
+                  renderTextLayer={false}
+                  loading={
+                    <div className="flex items-center justify-center bg-white h-[842px] w-[595px] border">
+                      <p className="text-slate-400">Loading page...</p>
+                    </div>
+                  }
+                  error={
+                    <div className="flex items-center justify-center bg-white h-[842px] w-[595px] border">
+                      <p className="text-red-500">Error loading page</p>
+                    </div>
+                  }
                 />
                 
                 {/* Overlays for editing elements */}
@@ -138,7 +183,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
                       key={pageNum.id}
                       pageNumber={pageNum}
                       currentPage={currentPage}
-                      totalPages={numPages || 0}
+                      totalPages={numPages || totalPages || 0}
                       editable={activeToolPanel === 'pageNumber'}
                     />
                   ))}
@@ -146,7 +191,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
               </div>
             </Document>
           ) : (
-            <div className="flex items-center justify-center bg-white h-[842px] w-[595px]">
+            <div className="flex items-center justify-center bg-white h-[842px] w-[595px] border shadow-xl">
               <p className="text-slate-400">No document loaded</p>
             </div>
           )}
