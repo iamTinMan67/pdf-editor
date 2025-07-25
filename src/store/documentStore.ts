@@ -116,8 +116,9 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     }
 
     try {
-      // Create a copy of the ArrayBuffer to prevent detachment
-      const bufferCopy = state.currentDocument.file.slice(0);
+      // Create a fresh copy of the ArrayBuffer to prevent detachment
+      const originalBuffer = state.currentDocument.file;
+      const bufferCopy = originalBuffer.slice(0);
       const pdfDoc = await PDFDocument.load(bufferCopy);
       const pages = pdfDoc.getPages();
 
@@ -142,11 +143,12 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
               signatureImage = await pdfDoc.embedJpg(imageBytes);
             }
           
-            // Convert from screen coordinates to PDF coordinates
-            const pdfX = sig.position.x * (width / 595);
-            const pdfY = height - (sig.position.y * (height / 842)) - (sig.size.height * (height / 842));
-            const pdfWidth = sig.size.width * (width / 595);
-            const pdfHeight = sig.size.height * (height / 842);
+            // Convert from screen coordinates to PDF coordinates (scale 1.2 is used in viewer)
+            const scale = 1.2;
+            const pdfX = (sig.position.x / scale) * (width / 595);
+            const pdfY = height - ((sig.position.y / scale) * (height / 842)) - ((sig.size.height / scale) * (height / 842));
+            const pdfWidth = (sig.size.width / scale) * (width / 595);
+            const pdfHeight = (sig.size.height / scale) * (height / 842);
             
             page.drawImage(signatureImage, {
               x: pdfX,
@@ -159,9 +161,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           }
         } else if (sig.type === 'text' && sig.text) {
           // For text signatures, add text
-          const fontSize = (sig.textStyle?.fontSize || 32) * (width / 595);
-          const pdfX = sig.position.x * (width / 595);
-          const pdfY = height - (sig.position.y * (height / 842));
+          const scale = 1.2;
+          const fontSize = ((sig.textStyle?.fontSize || 32) / scale) * (width / 595);
+          const pdfX = (sig.position.x / scale) * (width / 595);
+          const pdfY = height - ((sig.position.y / scale) * (height / 842));
           
           page.drawText(sig.text, {
             x: pdfX,
@@ -191,11 +194,12 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             embedImage = await pdfDoc.embedJpg(imageBytes);
           }
           
-          // Convert from screen coordinates to PDF coordinates
-          const pdfX = img.position.x * (width / 595);
-          const pdfY = height - (img.position.y * (height / 842)) - (img.size.height * (height / 842));
-          const pdfWidth = img.size.width * (width / 595);
-          const pdfHeight = img.size.height * (height / 842);
+          // Convert from screen coordinates to PDF coordinates (scale 1.2 is used in viewer)
+          const scale = 1.2;
+          const pdfX = (img.position.x / scale) * (width / 595);
+          const pdfY = height - ((img.position.y / scale) * (height / 842)) - ((img.size.height / scale) * (height / 842));
+          const pdfWidth = (img.size.width / scale) * (width / 595);
+          const pdfHeight = (img.size.height / scale) * (height / 842);
           
           page.drawImage(embedImage, {
             x: pdfX,
@@ -214,9 +218,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           // Apply to all pages
           pages.forEach((page, index) => {
             const { width, height } = page.getSize();
-            const fontSize = (pageNum.fontSize || 12) * (width / 595);
-            const pdfX = pageNum.position.x * (width / 595);
-            const pdfY = height - (pageNum.position.y * (height / 842));
+            const scale = 1.2;
+            const fontSize = ((pageNum.fontSize || 12) / scale) * (width / 595);
+            const pdfX = (pageNum.position.x / scale) * (width / 595);
+            const pdfY = height - ((pageNum.position.y / scale) * (height / 842));
             
             const text = pageNum.template
               .replace('{page}', (index + pageNum.startingNumber).toString())
@@ -235,9 +240,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           if (pageIndex >= 0 && pageIndex < pages.length) {
             const page = pages[pageIndex];
             const { width, height } = page.getSize();
-            const fontSize = (pageNum.fontSize || 12) * (width / 595);
-            const pdfX = pageNum.position.x * (width / 595);
-            const pdfY = height - (pageNum.position.y * (height / 842));
+            const scale = 1.2;
+            const fontSize = ((pageNum.fontSize || 12) / scale) * (width / 595);
+            const pdfX = (pageNum.position.x / scale) * (width / 595);
+            const pdfY = height - ((pageNum.position.y / scale) * (height / 842));
             
             const text = pageNum.template
               .replace('{page}', (pageNum.page + pageNum.startingNumber - 1).toString())
@@ -260,8 +266,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
         downloadFile(pdfBytes, state.currentDocument.name);
         showToast('PDF exported successfully!', 'success');
       } else {
-        // Create a new ArrayBuffer to prevent detachment issues
-        const newBuffer = pdfBytes.buffer.slice(0);
+        // Update the current document with the saved PDF
+        const newBuffer = new ArrayBuffer(pdfBytes.length);
+        const newView = new Uint8Array(newBuffer);
+        newView.set(pdfBytes);
         
         set({
           currentDocument: {
