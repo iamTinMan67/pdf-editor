@@ -59,14 +59,30 @@ const PageNumberPanel: React.FC = () => {
         break;
     }
     
-    addPageNumber({
-      id: `pagenum-${Date.now()}`,
-      template,
-      page: 0, // Use 0 to indicate it should appear on all pages
-      position: { x, y },
-      startingNumber,
-      alignment: position.includes('left') ? 'left' : position.includes('right') ? 'right' : 'center'
-    });
+    if (format === 'page-of-total') {
+      // For "Page X of Y" format, add individual page numbers for each page
+      const { totalPages } = useDocumentStore.getState();
+      for (let pageIndex = 1; pageIndex <= totalPages; pageIndex++) {
+        addPageNumber({
+          id: `pagenum-${Date.now()}-${pageIndex}`,
+          template,
+          page: pageIndex,
+          position: { x, y },
+          startingNumber,
+          alignment: position.includes('left') ? 'left' : position.includes('right') ? 'right' : 'center'
+        });
+      }
+    } else {
+      // For other formats, use the original behavior (page 0 = all pages)
+      addPageNumber({
+        id: `pagenum-${Date.now()}`,
+        template,
+        page: 0, // Use 0 to indicate it should appear on all pages
+        position: { x, y },
+        startingNumber,
+        alignment: position.includes('left') ? 'left' : position.includes('right') ? 'right' : 'center'
+      });
+    }
   };
 
   return (
@@ -155,7 +171,7 @@ const PageNumberPanel: React.FC = () => {
                     {pageNum.template.replace('{page}', '1').replace('{total}', 'X')}
                   </p>
                   <p className="text-xs text-slate-500">
-                    Starting from page {pageNum.startingNumber}
+                    {pageNum.page === 0 ? `All pages, starting from ${pageNum.startingNumber}` : `Page ${pageNum.page}`}
                   </p>
                 </div>
                 <button
