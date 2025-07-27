@@ -47,7 +47,7 @@ export const PageManagementPanel: React.FC = () => {
 
   const handleAddMultiplePages = async () => {
     const count = prompt('How many pages would you like to add after the current page? (1-10)');
-    if (count === null) return;
+    if (count === null || count.trim() === '') return;
     
     const numPages = parseInt(count);
     if (isNaN(numPages) || numPages < 1 || numPages > 10) {
@@ -58,11 +58,17 @@ export const PageManagementPanel: React.FC = () => {
     setIsAddingPages(true);
     try {
       for (let i = 0; i < numPages; i++) {
-        await addPage(currentPage + i);
+        console.log(`Adding page ${i + 1} of ${numPages}`);
+        const currentState = useDocumentStore.getState();
+        await addPage(currentState.currentPage + i);
+        // Small delay to prevent overwhelming the system
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
+      console.log('Successfully added all pages');
     } catch (error) {
       console.error('Error adding pages:', error);
-      alert('Failed to add pages. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to add pages: ${errorMessage}. Please try again.`);
     } finally {
       setIsAddingPages(false);
     }

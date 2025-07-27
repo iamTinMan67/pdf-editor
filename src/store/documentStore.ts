@@ -429,24 +429,15 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
 
     try {
       // Save to history before making changes
-      const saveToHistory = () => {
-        const currentState = get();
-        const newHistoryEntry = createStateSnapshot(currentState);
-        const newHistory = currentState.history.slice(0, currentState.currentHistoryIndex + 1);
-        newHistory.push(newHistoryEntry);
-        
-        set({
-          history: newHistory,
-          currentHistoryIndex: newHistory.length - 1,
-          canUndo: newHistory.length > 1,
-          canRedo: false
-        });
-      };
-      
-      saveToHistory();
+      get().saveToHistory();
 
       // Load the PDF document
-      const bufferCopy = state.currentDocument.file.slice(0);
+      const originalBuffer = state.currentDocument.file;
+      if (!originalBuffer || originalBuffer.byteLength === 0) {
+        throw new Error('Document buffer is empty or invalid');
+      }
+      
+      const bufferCopy = originalBuffer.slice(0);
       const pdfDoc = await PDFDocument.load(bufferCopy);
       
       // Add a new blank page after the specified index
@@ -464,23 +455,24 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       const newTotalPages = pdfDoc.getPageCount();
       
       // Update the document and state
+      const currentState = get();
       set({
         currentDocument: {
-          ...state.currentDocument,
+          ...currentState.currentDocument!,
           file: newBuffer,
         },
         totalPages: newTotalPages,
         currentPage: afterPageIndex + 1,
         // Update page numbers for elements that come after the inserted page
-        signatures: state.signatures.map(sig => ({
+        signatures: currentState.signatures.map(sig => ({
           ...sig,
           page: sig.page > afterPageIndex ? sig.page + 1 : sig.page
         })),
-        images: state.images.map(img => ({
+        images: currentState.images.map(img => ({
           ...img,
           page: img.page > afterPageIndex ? img.page + 1 : img.page
         })),
-        pageNumbers: state.pageNumbers.map(num => ({
+        pageNumbers: currentState.pageNumbers.map(num => ({
           ...num,
           page: num.page > afterPageIndex && num.page !== 0 ? num.page + 1 : num.page
         }))
@@ -489,18 +481,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       showToast('New page added successfully', 'success');
     } catch (error) {
       console.error('Error adding page:', error);
-      showToast(`Error adding page: ${error.message}`, 'error');
-      // Restore previous state on error
-      const currentState = get();
-      if (currentState.history.length > 0 && currentState.currentHistoryIndex >= 0) {
-        const previousState = currentState.history[currentState.currentHistoryIndex];
-        set({
-          signatures: previousState.signatures,
-          images: previousState.images,
-          pageNumbers: previousState.pageNumbers,
-          totalPages: previousState.totalPages,
-        });
-      }
+      showToast(`Error adding page: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      
+      // Don't restore state on error to prevent document loss
+      // Just log the error and let the user try again
     }
   },
 
