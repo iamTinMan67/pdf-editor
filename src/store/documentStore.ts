@@ -31,8 +31,8 @@ interface DocumentStoreActions {
   addPageNumber: (pageNumber: PageNumberType) => void;
   updatePageNumber: (pageNumber: PageNumberType) => void;
   removePageNumber: (id: string) => void;
-  deletePage: (pageIndex: number) => void;
-  addPage: (afterPageIndex: number) => void;
+  deletePage: (pageIndex: number) => Promise<void>;
+  addPage: (afterPageIndex: number) => Promise<void>;
   reorderPages: (fromIndex: number, toIndex: number) => void;
   setCurrentPage: (page: number) => void;
   setTotalPages: (pages: number) => void;
@@ -357,37 +357,125 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     });
   },
 
-  deletePage: (pageIndex) => {
+  deletePage: async (pageIndex) => {
     const state = get();
-    state.saveToHistory();
-    
-    const newTotalPages = Math.max(1, state.totalPages - 1);
-    let newCurrentPage = state.currentPage;
-    
-    if (pageIndex === state.currentPage) {
-      newCurrentPage = pageIndex > 1 ? pageIndex - 1 : 1;
-    } else if (pageIndex < state.currentPage) {
-      newCurrentPage = state.currentPage - 1;
+    if (!state.currentDocument || state.totalPages <= 1) {
+      showToast('Cannot delete the only remaining page', 'error');
+      return;
     }
-    
-    set({
-      totalPages: newTotalPages,
-      currentPage: newCurrentPage
-    });
-    
-    showToast(`Page ${pageIndex} deleted`, 'success');
+
+    state.saveToHistory();
+
+    try {
+      // Load the PDF document
+      const bufferCopy = state.currentDocument.file.slice(0);
+      const pdfDoc = await PDFDocument.load(bufferCopy);
+      
+      // Remove the page (pageIndex is 1-based, but removePage expects 0-based)
+      pdfDoc.removePage(pageIndex - 1);
+      
+      // Save the modified PDF
+      const pdfBytes = await pdfDoc.save();
+      const newBuffer = new ArrayBuffer(pdfBytes.length);
+      const newView = new Uint8Array(newBuffer);
+      newView.set(pdfBytes);
+      
+      const newTotalPages = pdfDoc.getPageCount();
+      let newCurrentPage = state.currentPage;
+      
+      // Adjust current page if necessary
+      if (pageIndex === state.currentPage) {
+        newCurrentPage = pageIndex > 1 ? pageIndex - 1 : 1;
+      } else if (pageIndex < state.currentPage) {
+        newCurrentPage = state.currentPage - 1;
+      }
+      
+      // Update the document and state
+      set({
+        currentDocument: {
+          ...state.currentDocument,
+          file: newBuffer,
+        },
+        totalPages: newTotalPages,
+        currentPage: Math.min(newCurrentPage, newTotalPages),
+        // Remove elements that were on the deleted page
+        signatures: state.signatures.filter(sig => sig.page !== pageIndex).map(sig => ({
+          ...sig,
+          page: sig.page > pageIndex ? sig.page - 1 : sig.page
+        })),
+        images: state.images.filter(img => img.page !== pageIndex).map(img => ({
+          ...img,
+          page: img.page > pageIndex ? img.page - 1 : img.page
+        })),
+        pageNumbers: state.pageNumbers.filter(num => num.page !== pageIndex && num.page !== 0).map(num => ({
+          ...num,
+          page: num.page > pageIndex ? num.page - 1 : num.page
+        }))
+      });
+      
+      showToast(`Page ${pageIndex} deleted successfully`, 'success');
+    } catch (error) {
+      console.error('Error deleting page:', error);
+      showToast('Error deleting page', 'error');
+    }
   },
 
-  addPage: (afterPageIndex) => {
+  addPage: async (afterPageIndex) => {
     const state = get();
+    if (!state.currentDocument) {
+      showToast('No document loaded', 'error');
+      return;
+    }
+
     state.saveToHistory();
-    
-    set({
-      totalPages: state.totalPages + 1,
-      currentPage: afterPageIndex + 1
-    });
-    
-    showToast('New page added', 'success');
+
+    try {
+      // Load the PDF document
+      const bufferCopy = state.currentDocument.file.slice(0);
+      const pdfDoc = await PDFDocument.load(bufferCopy);
+      
+      // Add a new blank page after the specified index
+      const newPage = pdfDoc.insertPage(afterPageIndex);
+      
+      // Set standard A4 size (595.28 x 841.89 points)
+      newPage.setSize(595.28, 841.89);
+      
+      // Save the modified PDF
+      const pdfBytes = await pdfDoc.save();
+      const newBuffer = new ArrayBuffer(pdfBytes.length);
+      const newView = new Uint8Array(newBuffer);
+      newView.set(pdfBytes);
+      
+      const newTotalPages = pdfDoc.getPageCount();
+      
+      // Update the document and state
+      set({
+        currentDocument: {
+          ...state.currentDocument,
+          file: newBuffer,
+        },
+        totalPages: newTotalPages,
+        currentPage: afterPageIndex + 1,
+        // Update page numbers for elements that come after the inserted page
+        signatures: state.signatures.map(sig => ({
+          ...sig,
+          page: sig.page > afterPageIndex ? sig.page + 1 : sig.page
+        })),
+        images: state.images.map(img => ({
+          ...img,
+          page: img.page > afterPageIndex ? img.page + 1 : img.page
+        })),
+        pageNumbers: state.pageNumbers.map(num => ({
+          ...num,
+          page: num.page > afterPageIndex && num.page !== 0 ? num.page + 1 : num.page
+        }))
+      });
+      
+      showToast('New page added successfully', 'success');
+    } catch (error) {
+      console.error('Error adding page:', error);
+      showToast('Error adding page', 'error');
+    }
   },
 
   reorderPages: (fromIndex, toIndex) => {

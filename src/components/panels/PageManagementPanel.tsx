@@ -25,16 +25,16 @@ const PageManagementPanel: React.FC = () => {
     }
   };
   
-  const handleAddBlankPage = () => {
+  const handleAddBlankPage = async () => {
     // Add a blank page after the current page
-    addPage(currentPage);
+    await addPage(currentPage);
   };
   
-  const handleAddMultiplePages = () => {
+  const handleAddMultiplePages = async () => {
     const count = parseInt(prompt('How many pages would you like to add?') || '1');
     if (count > 0 && count <= 50) {
       for (let i = 0; i < count; i++) {
-        addPage(currentPage + i);
+        await addPage(currentPage + i);
       }
     }
   };
@@ -67,8 +67,10 @@ const PageManagementPanel: React.FC = () => {
     const confirmMessage = `Are you sure you want to delete ${pageList.length} page${pageList.length > 1 ? 's' : ''}?`;
     
     if (window.confirm(confirmMessage)) {
-      pageList.forEach(pageIndex => {
-        deletePage(pageIndex);
+      pageList.forEach(async (pageIndex, index) => {
+        // Adjust page index for previously deleted pages
+        const adjustedIndex = pageIndex - index;
+        await deletePage(adjustedIndex);
       });
       setSelectedPages(new Set());
       setSelectAll(false);
