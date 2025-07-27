@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { showToast } from '../components/ui/Toaster';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { 
   DocumentState, 
   SignatureType, 
@@ -122,6 +122,9 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       const pdfDoc = await PDFDocument.load(bufferCopy);
       const pages = pdfDoc.getPages();
 
+      // Embed a standard font for text rendering
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
       // Process signatures
       for (const sig of state.signatures) {
         const pageIndex = sig.page - 1;
@@ -171,6 +174,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             y: pdfY,
             size: fontSize,
             color: rgb(0, 0, 0),
+            font: font,
           });
         }
       }
@@ -232,6 +236,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
               y: pdfY,
               size: fontSize,
               color: rgb(0, 0, 0),
+              font: font,
             });
           });
         } else {
@@ -254,6 +259,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
               y: pdfY,
               size: fontSize,
               color: rgb(0, 0, 0),
+              font: font,
             });
           }
         }
