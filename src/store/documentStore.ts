@@ -427,7 +427,8 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       return;
     }
 
-    state.saveToHistory();
+    // Save to history before making changes
+    get().saveToHistory();
 
     try {
       // Load the PDF document
@@ -474,7 +475,8 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       showToast('New page added successfully', 'success');
     } catch (error) {
       console.error('Error adding page:', error);
-      showToast('Error adding page', 'error');
+      showToast(`Error adding page: ${error.message}`, 'error');
+      // Don't reset the document state on error
     }
   },
 

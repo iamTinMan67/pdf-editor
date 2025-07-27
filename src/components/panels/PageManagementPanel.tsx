@@ -31,11 +31,28 @@ const PageManagementPanel: React.FC = () => {
   };
   
   const handleAddMultiplePages = async () => {
-    const count = parseInt(prompt('How many pages would you like to add?') || '1');
-    if (count > 0 && count <= 50) {
+    const input = prompt('How many pages would you like to add?');
+    if (input === null) return; // User cancelled
+    
+    const count = parseInt(input);
+    if (isNaN(count) || count <= 0) {
+      alert('Please enter a valid number greater than 0');
+      return;
+    }
+    
+    if (count > 50) {
+      alert('Maximum 50 pages can be added at once');
+      return;
+    }
+    
+    try {
+      // Add pages sequentially to maintain proper order
       for (let i = 0; i < count; i++) {
         await addPage(currentPage + i);
       }
+    } catch (error) {
+      console.error('Error adding multiple pages:', error);
+      alert('Error adding pages. Please try again.');
     }
   };
 
