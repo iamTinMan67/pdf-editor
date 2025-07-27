@@ -31,8 +31,54 @@ const PageManagementPanel: React.FC = () => {
   };
   
   const handleAddMultiplePages = async () => {
-    const input = prompt('How many pages would you like to add?');
-    if (input === null) return; // User cancelled
+    try {
+      const input = prompt('How many pages would you like to add?');
+      if (input === null) return; // User cancelled
+      
+      const count = parseInt(input);
+      if (isNaN(count) || count <= 0) {
+        alert('Please enter a valid number greater than 0');
+        return;
+      }
+      
+      if (count > 50) {
+        alert('Maximum 50 pages can be added at once');
+        return;
+      }
+      
+      // Show loading state
+      const originalText = 'Add Multiple Pages';
+      const buttonElement = document.querySelector('[data-testid="add-multiple-pages"]') as HTMLButtonElement;
+      if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.textContent = `Adding ${count} pages...`;
+      }
+      
+      // Add pages sequentially
+      for (let i = 0; i < count; i++) {
+        await addPage(currentPage + i);
+        // Small delay to prevent overwhelming the system
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Reset button state
+      if (buttonElement) {
+        buttonElement.disabled = false;
+        buttonElement.textContent = originalText;
+      }
+      
+    } catch (error) {
+      console.error('Error in handleAddMultiplePages:', error);
+      alert(`Error adding pages: ${error.message}`);
+      
+      // Reset button state on error
+      const buttonElement = document.querySelector('[data-testid="add-multiple-pages"]') as HTMLButtonElement;
+      if (buttonElement) {
+        buttonElement.disabled = false;
+        buttonElement.textContent = 'Add Multiple Pages';
+      }
+    }
+  };
     
     const count = parseInt(input);
     if (isNaN(count) || count <= 0) {
@@ -127,6 +173,7 @@ const PageManagementPanel: React.FC = () => {
         
         <button
           onClick={handleAddMultiplePages}
+          data-testid="add-multiple-pages"
           className="w-full py-2 rounded-md bg-blue-500 text-white hover:bg-blue-600 flex items-center justify-center"
         >
           <Plus className="h-4 w-4 mr-2" />

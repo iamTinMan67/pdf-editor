@@ -427,10 +427,24 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       return;
     }
 
-    // Save to history before making changes
-    get().saveToHistory();
-
     try {
+      // Save to history before making changes
+      const saveToHistory = () => {
+        const currentState = get();
+        const newHistoryEntry = createStateSnapshot(currentState);
+        const newHistory = currentState.history.slice(0, currentState.currentHistoryIndex + 1);
+        newHistory.push(newHistoryEntry);
+        
+        set({
+          history: newHistory,
+          currentHistoryIndex: newHistory.length - 1,
+          canUndo: newHistory.length > 1,
+          canRedo: false
+        });
+      };
+      
+      saveToHistory();
+
       // Load the PDF document
       const bufferCopy = state.currentDocument.file.slice(0);
       const pdfDoc = await PDFDocument.load(bufferCopy);
@@ -476,7 +490,17 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     } catch (error) {
       console.error('Error adding page:', error);
       showToast(`Error adding page: ${error.message}`, 'error');
-      // Don't reset the document state on error
+      // Restore previous state on error
+      const currentState = get();
+      if (currentState.history.length > 0 && currentState.currentHistoryIndex >= 0) {
+        const previousState = currentState.history[currentState.currentHistoryIndex];
+        set({
+          signatures: previousState.signatures,
+          images: previousState.images,
+          pageNumbers: previousState.pageNumbers,
+          totalPages: previousState.totalPages,
+        });
+      }
     }
   },
 
@@ -552,5 +576,24 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       canUndo: newHistory.length > 1,
       canRedo: false
     });
+  },
+
+  // Helper method to safely save to history
+  _saveToHistory: () => {
+    const state = get();
+    try {
+      const newHistoryEntry = createStateSnapshot(state);
+      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
+      newHistory.push(newHistoryEntry);
+      
+      set({
+        history: newHistory,
+        currentHistoryIndex: newHistory.length - 1,
+        canUndo: newHistory.length > 1,
+        canRedo: false
+      });
+    } catch (error) {
+      console.error('Error saving to history:', error);
+    }
   }
 }));
