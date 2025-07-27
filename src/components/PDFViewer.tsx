@@ -16,7 +16,7 @@ interface PDFViewerProps {
 }
 
 const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
-  const { currentDocument, signatures, images, pageNumbers, currentPage, setCurrentPage, totalPages } = useDocumentStore();
+  const { currentDocument, signatures, images, pageNumbers, currentPage, setCurrentPage, totalPages, documentKey } = useDocumentStore();
   const [numPages, setNumPages] = useState<number | null>(null);
   const [scale, setScale] = useState<number>(1.2);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
@@ -128,6 +128,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
         <div className="relative inline-block shadow-xl">
           {documentUrl ? (
             <Document
+              key={documentKey}
               file={documentUrl}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}

@@ -17,6 +17,7 @@ interface DocumentStoreState {
   currentHistoryIndex: number;
   totalPages: number;
   currentPage: number;
+  documentKey: number;
 }
 
 interface DocumentStoreActions {
@@ -76,6 +77,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
   currentHistoryIndex: -1,
   totalPages: 0,
   currentPage: 1,
+  documentKey: 0,
   canUndo: false,
   canRedo: false,
 
@@ -92,6 +94,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       currentHistoryIndex: -1,
       totalPages: 1, // Will be updated after loading
       currentPage: 1,
+      documentKey: get().documentKey + 1,
       canUndo: false,
       canRedo: false
     });
@@ -286,6 +289,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             ...state.currentDocument,
             file: newBuffer,
           },
+          documentKey: get().documentKey + 1,
         });
         get().saveToHistory();
         showToast('PDF saved successfully!', 'success');
@@ -409,6 +413,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
         },
         totalPages: newTotalPages,
         currentPage: Math.min(newCurrentPage, newTotalPages),
+        documentKey: get().documentKey + 1,
         // Remove elements that were on the deleted page
         signatures: state.signatures.filter(sig => sig.page !== pageIndex).map(sig => ({
           ...sig,
@@ -474,6 +479,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
         },
         totalPages: newTotalPages,
         currentPage: afterPageIndex + 1,
+        documentKey: get().documentKey + 1,
         // Update page numbers for elements that come after the inserted page
         signatures: currentState.signatures.map(sig => ({
           ...sig,
