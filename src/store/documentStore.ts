@@ -48,6 +48,10 @@ const createStateSnapshot = (state: DocumentStoreState): DocumentState => ({
   images: [...state.images],
   pageNumbers: [...state.pageNumbers],
   totalPages: state.totalPages,
+  currentDocument: state.currentDocument ? {
+    name: state.currentDocument.name,
+    file: state.currentDocument.file.slice(0) // Deep copy the ArrayBuffer
+  } : null,
 });
 
 // Helper to download a file
@@ -283,6 +287,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             file: newBuffer,
           },
         });
+        get().saveToHistory();
         showToast('PDF saved successfully!', 'success');
       }
     } catch (error) {
@@ -527,6 +532,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     const previousState = state.history[state.currentHistoryIndex - 1];
     
     set({
+      currentDocument: previousState.currentDocument,
       signatures: previousState.signatures,
       images: previousState.images,
       pageNumbers: previousState.pageNumbers,
@@ -544,6 +550,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     const nextState = state.history[state.currentHistoryIndex + 1];
     
     set({
+      currentDocument: nextState.currentDocument,
       signatures: nextState.signatures,
       images: nextState.images,
       pageNumbers: nextState.pageNumbers,

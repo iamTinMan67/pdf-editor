@@ -57,4 +57,5 @@ export interface DocumentState {
   images: ImageType[];
   pageNumbers: PageNumberType[];
   totalPages: number;
+  currentDocument: { name: string; file: ArrayBuffer } | null;
 }
