@@ -34,6 +34,7 @@ interface DocumentStoreActions {
   removePageNumber: (id: string) => void;
   deletePage: (pageIndex: number) => Promise<void>;
   addPage: (afterPageIndex: number) => Promise<void>;
+  addPagesFromPDF: (pdfBuffer: ArrayBuffer, afterPageIndex: number) => Promise<void>;
   reorderPages: (fromIndex: number, toIndex: number) => void;
   setCurrentPage: (page: number) => void;
   setTotalPages: (pages: number) => void;
@@ -502,6 +503,78 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       
       // Don't restore state on error to prevent document loss
       // Just log the error and let the user try again
+    }
+  },
+
+  addPagesFromPDF: async (pdfBuffer, afterPageIndex) => {
+    const state = get();
+    if (!state.currentDocument) {
+      showToast('No document loaded', 'error');
+      return;
+    }
+
+    try {
+      // Save to history before making changes
+      get().saveToHistory();
+
+      // Load both the current document and the PDF to import
+      const originalBuffer = state.currentDocument.file;
+      if (!originalBuffer || originalBuffer.byteLength === 0) {
+        throw new Error('Document buffer is empty or invalid');
+      }
+      
+      const bufferCopy = originalBuffer.slice(0);
+      const currentPdfDoc = await PDFDocument.load(bufferCopy);
+      const importPdfDoc = await PDFDocument.load(pdfBuffer);
+      
+      // Get all pages from the import PDF
+      const importPages = await currentPdfDoc.copyPages(importPdfDoc, importPdfDoc.getPageIndices());
+      
+      // Insert all pages after the specified index
+      let insertIndex = afterPageIndex;
+      for (const page of importPages) {
+        currentPdfDoc.insertPage(insertIndex, page);
+        insertIndex++;
+      }
+      
+      // Save the modified PDF
+      const pdfBytes = await currentPdfDoc.save();
+      const newBuffer = new ArrayBuffer(pdfBytes.length);
+      const newView = new Uint8Array(newBuffer);
+      newView.set(pdfBytes);
+      
+      const newTotalPages = currentPdfDoc.getPageCount();
+      const pagesAdded = importPages.length;
+      
+      // Update the document and state
+      const currentState = get();
+      set({
+        currentDocument: {
+          ...currentState.currentDocument!,
+          file: newBuffer,
+        },
+        totalPages: newTotalPages,
+        currentPage: afterPageIndex + 1,
+        documentKey: get().documentKey + 1,
+        // Update page numbers for elements that come after the inserted pages
+        signatures: currentState.signatures.map(sig => ({
+          ...sig,
+          page: sig.page > afterPageIndex ? sig.page + pagesAdded : sig.page
+        })),
+        images: currentState.images.map(img => ({
+          ...img,
+          page: img.page > afterPageIndex ? img.page + pagesAdded : img.page
+        })),
+        pageNumbers: currentState.pageNumbers.map(num => ({
+          ...num,
+          page: num.page > afterPageIndex && num.page !== 0 ? num.page + pagesAdded : num.page
+        }))
+      });
+      
+      showToast(`Successfully imported ${pagesAdded} page(s) from PDF`, 'success');
+    } catch (error) {
+      console.error('Error importing PDF pages:', error);
+      showToast(`Error importing PDF: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   },
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDocumentStore } from '../../store/documentStore';
-import { Plus, Trash2, ChevronLeft, ChevronRight, Check, Square, FileText } from 'lucide-react';
+import { Plus, Trash2, ChevronLeft, ChevronRight, Check, Square, FileText, Upload, FileX } from 'lucide-react';
 
 export const PageManagementPanel: React.FC = () => {
   const { 
@@ -14,6 +14,8 @@ export const PageManagementPanel: React.FC = () => {
   
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
   const [isAddingPages, setIsAddingPages] = useState(false);
+  const [showAddPageModal, setShowAddPageModal] = useState(false);
+  const [addPageType, setAddPageType] = useState<'blank' | 'import'>('blank');
 
   if (!currentDocument) {
     return (
@@ -45,7 +47,11 @@ export const PageManagementPanel: React.FC = () => {
     }
   };
 
-  const handleAddMultiplePages = async () => {
+  const handleAddSinglePage = () => {
+    setShowAddPageModal(true);
+  };
+
+  const handleAddMultipleBlankPages = async () => {
     const count = prompt('How many pages would you like to add after the current page? (1-10)');
     if (count === null || count.trim() === '') return;
     
@@ -73,6 +79,34 @@ export const PageManagementPanel: React.FC = () => {
       setIsAddingPages(false);
     }
   };
+
+  const handleAddPageConfirm = async () => {
+    if (addPageType === 'blank') {
+      await addPage(currentPage);
+      setShowAddPageModal(false);
+    } else {
+      // Trigger file input for PDF import
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.pdf';
+      fileInput.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            await addPagesFromPDF(arrayBuffer, currentPage);
+            setShowAddPageModal(false);
+          } catch (error) {
+            console.error('Error importing PDF:', error);
+            alert('Failed to import PDF. Please try again.');
+          }
+        }
+      };
+      fileInput.click();
+    }
+  };
+
+  const { addPagesFromPDF } = useDocumentStore();
 
   const handleDeleteSelected = async () => {
     if (selectedPages.size === 0) return;
@@ -125,7 +159,7 @@ export const PageManagementPanel: React.FC = () => {
         <h4 className="text-sm font-medium text-slate-700">Add Pages</h4>
         <div className="flex gap-2">
           <button
-            onClick={() => addPage(currentPage)}
+            onClick={handleAddSinglePage}
             className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
           >
             <Plus className="w-4 h-4" />
@@ -134,12 +168,12 @@ export const PageManagementPanel: React.FC = () => {
         </div>
         <div>
           <button
-            onClick={handleAddMultiplePages}
+            onClick={handleAddMultipleBlankPages}
             disabled={isAddingPages}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="w-4 h-4" />
-            {isAddingPages ? 'Adding...' : 'Add Multiple'}
+            {isAddingPages ? 'Adding...' : 'Add Multiple Blank'}
           </button>
         </div>
       </div>
@@ -253,6 +287,71 @@ export const PageManagementPanel: React.FC = () => {
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Add Page Modal */}
+      {showAddPageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-full mx-4">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">Add New Page</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Choose how you want to add a new page after page {currentPage}:
+            </p>
+            
+            <div className="space-y-3 mb-6">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="addPageType"
+                  value="blank"
+                  checked={addPageType === 'blank'}
+                  onChange={(e) => setAddPageType(e.target.value as 'blank' | 'import')}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <div className="flex items-center space-x-2">
+                  <FileX className="w-5 h-5 text-slate-500" />
+                  <div>
+                    <div className="font-medium text-slate-700">Blank Page</div>
+                    <div className="text-sm text-slate-500">Add an empty page</div>
+                  </div>
+                </div>
+              </label>
+              
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="addPageType"
+                  value="import"
+                  checked={addPageType === 'import'}
+                  onChange={(e) => setAddPageType(e.target.value as 'blank' | 'import')}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <div className="flex items-center space-x-2">
+                  <Upload className="w-5 h-5 text-slate-500" />
+                  <div>
+                    <div className="font-medium text-slate-700">Import from PDF</div>
+                    <div className="text-sm text-slate-500">Merge pages from another PDF</div>
+                  </div>
+                </div>
+              </label>
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowAddPageModal(false)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddPageConfirm}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                {addPageType === 'blank' ? 'Add Blank Page' : 'Select PDF File'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
