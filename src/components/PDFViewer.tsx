@@ -19,17 +19,23 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
   const { currentDocument, signatures, images, pageNumbers, currentPage, setCurrentPage, totalPages } = useDocumentStore();
   const [numPages, setNumPages] = useState<number | null>(null);
   const [scale, setScale] = useState<number>(1.2);
-  const [documentData, setDocumentData] = useState<ArrayBuffer | null>(null);
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Update document data when currentDocument changes
+  // Update document URL when currentDocument changes
   useEffect(() => {
     if (currentDocument?.file) {
-      // Create a fresh copy of the ArrayBuffer for react-pdf
-      const newBuffer = currentDocument.file.slice(0);
-      setDocumentData(newBuffer);
+      // Convert ArrayBuffer to Blob and create object URL
+      const blob = new Blob([currentDocument.file], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      setDocumentUrl(url);
+      
+      // Cleanup function to revoke the URL
+      return () => {
+        URL.revokeObjectURL(url);
+      };
     } else {
-      setDocumentData(null);
+      setDocumentUrl(null);
     }
   }, [currentDocument]);
 
@@ -46,7 +52,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
   const onDocumentLoadError = (error: Error) => {
     console.error('Error loading PDF:', error);
     setNumPages(null);
-    setDocumentData(null);
   };
 
   const changePage = (offset: number) => {
@@ -121,9 +126,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
       {/* PDF Document and Overlay */}
       <div className="flex-1 overflow-auto flex justify-center bg-slate-200 p-8">
         <div className="relative inline-block shadow-xl">
-          {documentData ? (
+          {documentUrl ? (
             <Document
-              file={documentData}
+              file={documentUrl}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
               className="pdf-document"
