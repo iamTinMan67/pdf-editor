@@ -56,8 +56,8 @@ export const PageManagementPanel: React.FC = () => {
     if (count === null || count.trim() === '') return;
     
     const numPages = parseInt(count);
-    if (isNaN(numPages) || numPages < 1 || numPages > 50) {
-      alert('Please enter a valid number between 1 and 50');
+    if (isNaN(numPages) || numPages < 1 || numPages > 100) {
+      alert('Please enter a valid number between 1 and 100');
       return;
     }
 
