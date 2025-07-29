@@ -483,25 +483,24 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       const newTotalPages = pdfDoc.getPageCount();
       
       // Update the document and state
-      const currentState = get();
       set({
-        currentDocument: {
-          ...currentState.currentDocument!,
+        currentDocument: state.currentDocument ? {
+          ...state.currentDocument,
           file: newBuffer,
-        },
+        } : null,
         totalPages: newTotalPages,
         currentPage: afterPageIndex + 1,
         documentKey: get().documentKey + 1,
         // Update page numbers for elements that come after the inserted page
-        signatures: currentState.signatures.map(sig => ({
+        signatures: state.signatures.map(sig => ({
           ...sig,
           page: sig.page > afterPageIndex ? sig.page + 1 : sig.page
         })),
-        images: currentState.images.map(img => ({
+        images: state.images.map(img => ({
           ...img,
           page: img.page > afterPageIndex ? img.page + 1 : img.page
         })),
-        pageNumbers: currentState.pageNumbers.map(num => ({
+        pageNumbers: state.pageNumbers.map(num => ({
           ...num,
           page: num.page > afterPageIndex && num.page !== 0 ? num.page + 1 : num.page
         }))
@@ -560,25 +559,24 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       const pagesAdded = importPages.length;
       
       // Update the document and state
-      const currentState = get();
       set({
         currentDocument: {
-          ...currentState.currentDocument!,
+          ...state.currentDocument!,
           file: newBuffer,
         },
         totalPages: newTotalPages,
         currentPage: afterPageIndex + 1,
         documentKey: get().documentKey + 1,
         // Update page numbers for elements that come after the inserted pages
-        signatures: currentState.signatures.map(sig => ({
+        signatures: state.signatures.map(sig => ({
           ...sig,
           page: sig.page > afterPageIndex ? sig.page + pagesAdded : sig.page
         })),
-        images: currentState.images.map(img => ({
+        images: state.images.map(img => ({
           ...img,
           page: img.page > afterPageIndex ? img.page + pagesAdded : img.page
         })),
-        pageNumbers: currentState.pageNumbers.map(num => ({
+        pageNumbers: state.pageNumbers.map(num => ({
           ...num,
           page: num.page > afterPageIndex && num.page !== 0 ? num.page + pagesAdded : num.page
         }))
