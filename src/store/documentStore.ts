@@ -459,7 +459,8 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       get().saveToHistory();
 
       // Load the PDF document
-      const originalBuffer = state.currentDocument.file;
+      const currentState = get();
+      const originalBuffer = currentState.currentDocument?.file;
       if (!originalBuffer || originalBuffer.byteLength === 0) {
         throw new Error('Document buffer is empty or invalid');
       }
