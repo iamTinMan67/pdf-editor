@@ -7,6 +7,7 @@ import ImageElement from './editor/ImageElement';
 import PageNumber from './editor/PageNumber';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import { showToast } from '../components/ui/Toaster';
 
 // Set the worker source for pdfjs
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
@@ -46,6 +47,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
     store.setTotalPages(numPages);
     if (currentPage > numPages) {
       setCurrentPage(1);
+    }
+    
+    // Show performance tip for large documents
+    if (numPages > 100) {
+      showToast(`Large document loaded (${numPages} pages). Consider working on smaller sections for better performance.`, 'info');
     }
   };
 

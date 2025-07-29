@@ -380,6 +380,11 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       return;
     }
 
+    // Show progress for large documents
+    if (state.totalPages > 50) {
+      showToast('Deleting page from large document...', 'info');
+    }
+
     state.saveToHistory();
 
     try {
@@ -442,6 +447,11 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     if (!state.currentDocument) {
       showToast('No document loaded', 'error');
       return;
+    }
+
+    // Show progress for large documents
+    if (state.totalPages > 50) {
+      showToast('Adding page to large document...', 'info');
     }
 
     try {
@@ -512,6 +522,8 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       showToast('No document loaded', 'error');
       return;
     }
+
+    showToast('Importing PDF pages...', 'info');
 
     try {
       // Save to history before making changes

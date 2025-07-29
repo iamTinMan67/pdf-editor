@@ -52,12 +52,12 @@ export const PageManagementPanel: React.FC = () => {
   };
 
   const handleAddMultipleBlankPages = async () => {
-    const count = prompt('How many pages would you like to add after the current page? (1-10)');
+    const count = prompt('How many pages would you like to add after the current page? (1-50)');
     if (count === null || count.trim() === '') return;
     
     const numPages = parseInt(count);
-    if (isNaN(numPages) || numPages < 1 || numPages > 10) {
-      alert('Please enter a valid number between 1 and 10');
+    if (isNaN(numPages) || numPages < 1 || numPages > 50) {
+      alert('Please enter a valid number between 1 and 50');
       return;
     }
 
@@ -67,8 +67,12 @@ export const PageManagementPanel: React.FC = () => {
         console.log(`Adding page ${i + 1} of ${numPages}`);
         const currentState = useDocumentStore.getState();
         await addPage(currentState.currentPage + i);
-        // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Longer delay for larger batches to prevent overwhelming the system
+        if (numPages > 20) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
       console.log('Successfully added all pages');
     } catch (error) {
@@ -213,7 +217,12 @@ export const PageManagementPanel: React.FC = () => {
       {/* Pages List */}
       <div className="space-y-2">
         <h4 className="text-sm font-medium text-slate-700">Pages ({totalPages})</h4>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
+        <div className="space-y-2 max-h-80 overflow-y-auto">
+          {totalPages > 50 && (
+            <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+              ⚠️ Large document ({totalPages} pages). Operations may take longer.
+            </div>
+          )}
           {pages.map((pageNum) => (
             <div
               key={pageNum}
