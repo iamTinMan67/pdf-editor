@@ -115,14 +115,14 @@ const ImageElement: React.FC<ImageElementProps> = ({ image, editable }) => {
         top: `${image.position.y}px`,
         width: `${image.size.width}px`,
         height: `${image.size.height}px`,
-        zIndex: isDragging || isResizing ? 100 : 10
+        zIndex: isDragging || isResizing ? 100 : 20
       }}
       onMouseDown={handleMouseDown}
     >
       <img
         src={image.dataURL}
         alt={image.originalName || 'Image'}
-        className="w-full h-full object-contain"
+        className="w-full h-full object-contain bg-white"
       />
       
       {editable && (

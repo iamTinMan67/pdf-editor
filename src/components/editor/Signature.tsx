@@ -186,11 +186,11 @@ const Signature: React.FC<SignatureProps> = ({ signature, editable }) => {
         <img
           src={signature.dataURL}
           alt="Signature"
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain bg-transparent"
         />
       ) : (
         <div
-          className="w-full h-full flex items-center"
+          className="w-full h-full flex items-center bg-transparent"
           style={{
             fontFamily: signature.textStyle?.fontFamily,
             fontSize: `${signature.textStyle?.fontSize}px`,

@@ -183,14 +183,14 @@ const PageNumber: React.FC<PageNumberProps> = ({
       style={{
         left: `${pageNumber.position.x}px`,
         top: `${pageNumber.position.y}px`,
-        zIndex: isDragging || isResizing || isSkewing ? 100 : 10,
+        zIndex: isDragging || isResizing || isSkewing ? 100 : 5,
         minWidth: '60px',
         minHeight: '30px'
       }}
       onMouseDown={handleMouseDown}
     >
       <div 
-        className="px-2 py-1 font-medium inline-block"
+        className="px-2 py-1 font-medium inline-block bg-white bg-opacity-80 rounded shadow-sm"
         style={{
           transform: getTransform(),
           transformOrigin: 'center center',
