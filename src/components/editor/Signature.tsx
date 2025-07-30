@@ -178,7 +178,7 @@ const Signature: React.FC<SignatureProps> = ({ signature, editable }) => {
         top: `${signature.position.y}px`,
         width: `${signature.size.width}px`,
         height: `${signature.size.height}px`,
-        zIndex: isDragging || isResizing || isSkewing ? 100 : 10
+        zIndex: isDragging || isResizing || isSkewing ? 100 : 15
       }}
       onMouseDown={handleMouseDown}
     >

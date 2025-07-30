@@ -190,8 +190,9 @@ const PageNumber: React.FC<PageNumberProps> = ({
       onMouseDown={handleMouseDown}
     >
       <div 
-        className="px-2 py-1 font-medium inline-block bg-white bg-opacity-80 rounded shadow-sm"
+        className="px-2 py-1 font-medium inline-block rounded shadow-sm"
         style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
           transform: getTransform(),
           transformOrigin: 'center center',
           textAlign,
