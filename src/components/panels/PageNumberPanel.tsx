@@ -47,15 +47,15 @@ const PageNumberPanel: React.FC = () => {
         break;
       case 'bottom-left':
         x = 5;
-        y = 95;
+        y = 800;
         break;
       case 'bottom-center':
         x = 50;
-        y = 95;
+        y = 800;
         break;
       case 'bottom-right':
         x = 95;
-        y = 95;
+        y = 800;
         break;
     }
     

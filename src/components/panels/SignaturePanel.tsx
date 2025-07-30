@@ -43,7 +43,7 @@ const SignaturePanel: React.FC = () => {
         type: 'drawn',
         dataURL,
         page: currentPage,
-        position: { x: 100, y: 100 },
+        position: { x: 100, y: 700 },
         size: { width: 150, height: 80 }
       });
       handleClear();
@@ -54,7 +54,7 @@ const SignaturePanel: React.FC = () => {
         text,
         textStyle,
         page: currentPage,
-        position: { x: 100, y: 100 },
+        position: { x: 100, y: 750 },
         size: { width: 200, height: 50 }
       });
       handleClear();
