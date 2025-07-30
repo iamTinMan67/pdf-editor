@@ -38,8 +38,9 @@ const SignaturePanel: React.FC = () => {
   const handleSave = () => {
     if (mode === 'draw' && sigCanvasRef.current && !isEmpty) {
       const dataURL = sigCanvasRef.current.toDataURL('image/png');
+      const uniqueId = `sig-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       addSignature({ 
-        id: `sig-${Date.now()}`,
+        id: uniqueId,
         type: 'drawn',
         dataURL,
         page: currentPage,
@@ -48,8 +49,9 @@ const SignaturePanel: React.FC = () => {
       });
       handleClear();
     } else if (mode === 'text' && text.trim()) {
+      const uniqueId = `sig-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       addSignature({
-        id: `sig-${Date.now()}`,
+        id: uniqueId,
         type: 'text',
         text,
         textStyle,

@@ -40,7 +40,7 @@ const ImagePanel: React.FC = () => {
         reader.onload = (event) => {
           if (typeof event.target?.result === 'string') {
             addImage({
-              id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
               dataURL: event.target.result,
               page: currentPage,
               position: { x: 100, y: 100 },

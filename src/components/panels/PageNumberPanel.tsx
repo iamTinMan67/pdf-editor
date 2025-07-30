@@ -63,8 +63,9 @@ const PageNumberPanel: React.FC = () => {
       // For "Page X of Y" format, add individual page numbers for each page
       const { totalPages } = useDocumentStore.getState();
       for (let pageIndex = 1; pageIndex <= totalPages; pageIndex++) {
+        const uniqueId = `pagenum-${Date.now()}-${pageIndex}-${Math.random().toString(36).substring(2, 9)}`;
         addPageNumber({
-          id: `pagenum-${Date.now()}-${pageIndex}`,
+          id: uniqueId,
           template,
           page: pageIndex,
           position: { x, y },
@@ -74,8 +75,9 @@ const PageNumberPanel: React.FC = () => {
       }
     } else {
       // For other formats, use the original behavior (page 0 = all pages)
+      const uniqueId = `pagenum-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       addPageNumber({
-        id: `pagenum-${Date.now()}`,
+        id: uniqueId,
         template,
         page: 0, // Use 0 to indicate it should appear on all pages
         position: { x, y },
