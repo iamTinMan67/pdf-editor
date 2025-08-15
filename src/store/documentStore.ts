@@ -263,11 +263,15 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
         // Create a new ArrayBuffer to prevent detachment issues
         const newBuffer = pdfBytes.buffer.slice(0);
         
+        // Clear the elements from the store since they're now embedded in the PDF
         set({
           currentDocument: {
             ...state.currentDocument,
             file: newBuffer,
           },
+          signatures: [],
+          images: [],
+          pageNumbers: [],
         });
         showToast('PDF saved successfully!', 'success');
       }
