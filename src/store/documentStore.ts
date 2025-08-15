@@ -141,11 +141,11 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       // Embed a standard font for text rendering
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-                    // Process signatures
-       const processedSignatureIds = new Set<string>();
-       for (const sig of state.signatures) {
-         // Skip if already processed
-         if (state.processedElements.has(sig.id)) continue;
+                           // Process signatures
+        const processedSignatureIds = new Set<string>();
+        for (const sig of state.signatures) {
+          // Skip if already processed in this save operation
+          if (processedSignatureIds.has(sig.id)) continue;
          
          const pageIndex = sig.page - 1;
          if (pageIndex < 0 || pageIndex >= pages.length) continue;
@@ -179,7 +179,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
              
              // Convert coordinates: remove viewer scaling and centering offset
              const pdfX = (sig.position.x - offsetX) / viewerScale;
-             const pdfY = height - (sig.position.y - offsetY) / viewerScale - (sig.size.height / viewerScale);
+             const pdfY = height - ((sig.position.y - offsetY) / viewerScale);
              const pdfWidth = sig.size.width / viewerScale;
              const pdfHeight = sig.size.height / viewerScale;
              
@@ -230,11 +230,11 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
          }
        }
 
-                    // Process images
-       const processedImageIds = new Set<string>();
-       for (const img of state.images) {
-         // Skip if already processed
-         if (state.processedElements.has(img.id)) continue;
+                            // Process images
+        const processedImageIds = new Set<string>();
+        for (const img of state.images) {
+          // Skip if already processed in this save operation
+          if (processedImageIds.has(img.id)) continue;
          
          const pageIndex = img.page - 1;
          if (pageIndex < 0 || pageIndex >= pages.length) continue;
@@ -263,11 +263,11 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
            const offsetX = (viewerWidth - width) / 2;
            const offsetY = (viewerHeight - height) / 2;
            
-           // Convert coordinates: remove viewer scaling and centering offset
-           const pdfX = (img.position.x - offsetX) / viewerScale;
-           const pdfY = height - (img.position.y - offsetY) / viewerScale - (img.size.height / viewerScale);
-           const pdfWidth = img.size.width / viewerScale;
-           const pdfHeight = img.size.height / viewerScale;
+                       // Convert coordinates: remove viewer scaling and centering offset
+            const pdfX = (img.position.x - offsetX) / viewerScale;
+            const pdfY = height - ((img.position.y - offsetY) / viewerScale);
+            const pdfWidth = img.size.width / viewerScale;
+            const pdfHeight = img.size.height / viewerScale;
           
           page.drawImage(embedImage, {
             x: pdfX,
@@ -353,33 +353,25 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
              // Save the PDF
        const pdfBytes = await pdfDoc.save();
        
-       // Update processed elements after successful save
-       const newProcessedElements = new Set([
-         ...state.processedElements,
-         ...processedSignatureIds,
-         ...processedImageIds
-       ]);
-       
-       if (asDownload) {
-         downloadFile(pdfBytes, state.currentDocument.name);
-         showToast('PDF exported successfully!', 'success');
-       } else {
-         // Update the current document with the saved PDF
-         const newBuffer = new ArrayBuffer(pdfBytes.length);
-         const newView = new Uint8Array(newBuffer);
-         newView.set(pdfBytes);
-         
-         // Update the document and processed elements
-         set({
-           currentDocument: {
-             ...state.currentDocument,
-             file: newBuffer,
-           },
-           processedElements: newProcessedElements,
-         });
-         get().saveToHistory();
-         showToast('PDF saved successfully!', 'success');
-       }
+               if (asDownload) {
+          downloadFile(pdfBytes, state.currentDocument.name);
+          showToast('PDF exported successfully!', 'success');
+        } else {
+          // Update the current document with the saved PDF
+          const newBuffer = new ArrayBuffer(pdfBytes.length);
+          const newView = new Uint8Array(newBuffer);
+          newView.set(pdfBytes);
+          
+          // Update the document but keep signatures editable
+          set({
+            currentDocument: {
+              ...state.currentDocument,
+              file: newBuffer,
+            },
+          });
+          get().saveToHistory();
+          showToast('PDF saved successfully!', 'success');
+        }
     } catch (error) {
       console.error('Error saving PDF:', error);
       showToast('Error saving PDF', 'error');
