@@ -166,12 +166,22 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
                signatureImage = await pdfDoc.embedJpg(imageBytes);
              }
            
-             // Convert from screen coordinates to PDF coordinates (scale 1.2 is used in viewer)
-             const scale = 1.2;
-             const pdfX = (sig.position.x / scale) * (width / 595);
-             const pdfY = height - ((sig.position.y / scale) * (height / 842)) - ((sig.size.height / scale) * (height / 842));
-             const pdfWidth = (sig.size.width / scale) * (width / 595);
-             const pdfHeight = (sig.size.height / scale) * (height / 842);
+             // Convert from screen coordinates to PDF coordinates
+             // The viewer uses a scale of 1.2 and centers the PDF
+             // We need to account for the actual PDF dimensions vs viewer dimensions
+             const viewerScale = 1.2;
+             const viewerWidth = 595 * viewerScale; // 714
+             const viewerHeight = 842 * viewerScale; // 1010.4
+             
+             // Calculate the offset to center the PDF in the viewer
+             const offsetX = (viewerWidth - width) / 2;
+             const offsetY = (viewerHeight - height) / 2;
+             
+             // Convert coordinates: remove viewer scaling and centering offset
+             const pdfX = (sig.position.x - offsetX) / viewerScale;
+             const pdfY = height - (sig.position.y - offsetY) / viewerScale - (sig.size.height / viewerScale);
+             const pdfWidth = sig.size.width / viewerScale;
+             const pdfHeight = sig.size.height / viewerScale;
              
              page.drawImage(signatureImage, {
                x: pdfX,
@@ -187,10 +197,19 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
            }
          } else if (sig.type === 'text' && sig.text) {
            // For text signatures, add text
-           const scale = 1.2;
-           const fontSize = ((sig.textStyle?.fontSize || 32) / scale) * (width / 595);
-           const pdfX = (sig.position.x / scale) * (width / 595);
-           const pdfY = height - ((sig.position.y / scale) * (height / 842));
+           // Use the same coordinate conversion as drawn signatures
+           const viewerScale = 1.2;
+           const viewerWidth = 595 * viewerScale; // 714
+           const viewerHeight = 842 * viewerScale; // 1010.4
+           
+           // Calculate the offset to center the PDF in the viewer
+           const offsetX = (viewerWidth - width) / 2;
+           const offsetY = (viewerHeight - height) / 2;
+           
+           // Convert coordinates: remove viewer scaling and centering offset
+           const pdfX = (sig.position.x - offsetX) / viewerScale;
+           const pdfY = height - (sig.position.y - offsetY) / viewerScale;
+           const fontSize = (sig.textStyle?.fontSize || 32) / viewerScale;
            
            // Parse color from hex to RGB
            const hexColor = sig.textStyle?.color || '#000000';
@@ -234,12 +253,21 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             embedImage = await pdfDoc.embedJpg(imageBytes);
           }
           
-          // Convert from screen coordinates to PDF coordinates (scale 1.2 is used in viewer)
-          const scale = 1.2;
-          const pdfX = (img.position.x / scale) * (width / 595);
-          const pdfY = height - ((img.position.y / scale) * (height / 842)) - ((img.size.height / scale) * (height / 842));
-          const pdfWidth = (img.size.width / scale) * (width / 595);
-          const pdfHeight = (img.size.height / scale) * (height / 842);
+                     // Convert from screen coordinates to PDF coordinates
+           // Use the same coordinate conversion as signatures
+           const viewerScale = 1.2;
+           const viewerWidth = 595 * viewerScale; // 714
+           const viewerHeight = 842 * viewerScale; // 1010.4
+           
+           // Calculate the offset to center the PDF in the viewer
+           const offsetX = (viewerWidth - width) / 2;
+           const offsetY = (viewerHeight - height) / 2;
+           
+           // Convert coordinates: remove viewer scaling and centering offset
+           const pdfX = (img.position.x - offsetX) / viewerScale;
+           const pdfY = height - (img.position.y - offsetY) / viewerScale - (img.size.height / viewerScale);
+           const pdfWidth = img.size.width / viewerScale;
+           const pdfHeight = img.size.height / viewerScale;
           
           page.drawImage(embedImage, {
             x: pdfX,
@@ -261,10 +289,19 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           // Apply to all pages
           pages.forEach((page, index) => {
             const { width, height } = page.getSize();
-            const scale = 1.2;
-            const fontSize = ((pageNum.fontSize || 12) / scale) * (width / 595);
-            const pdfX = (pageNum.position.x / scale) * (width / 595);
-            const pdfY = height - ((pageNum.position.y / scale) * (height / 842));
+            // Use the same coordinate conversion as other elements
+            const viewerScale = 1.2;
+            const viewerWidth = 595 * viewerScale; // 714
+            const viewerHeight = 842 * viewerScale; // 1010.4
+            
+            // Calculate the offset to center the PDF in the viewer
+            const offsetX = (viewerWidth - width) / 2;
+            const offsetY = (viewerHeight - height) / 2;
+            
+            // Convert coordinates: remove viewer scaling and centering offset
+            const pdfX = (pageNum.position.x - offsetX) / viewerScale;
+            const pdfY = height - (pageNum.position.y - offsetY) / viewerScale;
+            const fontSize = (pageNum.fontSize || 12) / viewerScale;
             
             const text = pageNum.template
               .replace('{page}', (index + pageNum.startingNumber).toString())
@@ -284,10 +321,19 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           if (pageIndex >= 0 && pageIndex < pages.length) {
             const page = pages[pageIndex];
             const { width, height } = page.getSize();
-            const scale = 1.2;
-            const fontSize = ((pageNum.fontSize || 12) / scale) * (width / 595);
-            const pdfX = (pageNum.position.x / scale) * (width / 595);
-            const pdfY = height - ((pageNum.position.y / scale) * (height / 842));
+            // Use the same coordinate conversion as other elements
+            const viewerScale = 1.2;
+            const viewerWidth = 595 * viewerScale; // 714
+            const viewerHeight = 842 * viewerScale; // 1010.4
+            
+            // Calculate the offset to center the PDF in the viewer
+            const offsetX = (viewerWidth - width) / 2;
+            const offsetY = (viewerHeight - height) / 2;
+            
+            // Convert coordinates: remove viewer scaling and centering offset
+            const pdfX = (pageNum.position.x - offsetX) / viewerScale;
+            const pdfY = height - (pageNum.position.y - offsetY) / viewerScale;
+            const fontSize = (pageNum.fontSize || 12) / viewerScale;
             
             const text = pageNum.template
               .replace('{page}', (pageNum.page + pageNum.startingNumber - 1).toString())
