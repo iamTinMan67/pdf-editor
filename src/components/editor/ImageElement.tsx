@@ -123,6 +123,7 @@ const ImageElement: React.FC<ImageElementProps> = ({ image, editable }) => {
         src={image.dataURL}
         alt={image.originalName || 'Image'}
         className="w-full h-full object-contain"
+        style={{ backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
       />
       
       {editable && (

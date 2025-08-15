@@ -3,7 +3,7 @@ import { Pencil, Image, Hash, FileText, GripVertical, X } from 'lucide-react';
 import SignaturePanel from './panels/SignaturePanel';
 import ImagePanel from './panels/ImagePanel';
 import PageNumberPanel from './panels/PageNumberPanel';
-import PageManagementPanel from './panels/PageManagementPanel';
+import { PageManagementPanel } from './panels/PageManagementPanel';
 import { useDocumentStore } from '../store/documentStore';
 
 interface ToolbarProps {

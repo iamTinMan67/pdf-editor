@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { showToast } from '../components/ui/Toaster';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { 
   DocumentState, 
   SignatureType, 
@@ -17,6 +17,7 @@ interface DocumentStoreState {
   currentHistoryIndex: number;
   totalPages: number;
   currentPage: number;
+  documentKey: number;
 }
 
 interface DocumentStoreActions {
@@ -31,8 +32,9 @@ interface DocumentStoreActions {
   addPageNumber: (pageNumber: PageNumberType) => void;
   updatePageNumber: (pageNumber: PageNumberType) => void;
   removePageNumber: (id: string) => void;
-  deletePage: (pageIndex: number) => void;
-  addPage: (afterPageIndex: number) => void;
+  deletePage: (pageIndex: number) => Promise<void>;
+  addPage: (afterPageIndex: number) => Promise<void>;
+  addPagesFromPDF: (pdfBuffer: ArrayBuffer, afterPageIndex: number) => Promise<void>;
   reorderPages: (fromIndex: number, toIndex: number) => void;
   setCurrentPage: (page: number) => void;
   setTotalPages: (pages: number) => void;
@@ -48,6 +50,10 @@ const createStateSnapshot = (state: DocumentStoreState): DocumentState => ({
   images: [...state.images],
   pageNumbers: [...state.pageNumbers],
   totalPages: state.totalPages,
+  currentDocument: state.currentDocument ? {
+    name: state.currentDocument.name,
+    file: state.currentDocument.file.slice(0) // Deep copy the ArrayBuffer
+  } : null,
 });
 
 // Helper to download a file
@@ -72,6 +78,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
   currentHistoryIndex: -1,
   totalPages: 0,
   currentPage: 1,
+  documentKey: 0,
   canUndo: false,
   canRedo: false,
 
@@ -88,6 +95,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       currentHistoryIndex: -1,
       totalPages: 1, // Will be updated after loading
       currentPage: 1,
+      documentKey: get().documentKey + 1,
       canUndo: false,
       canRedo: false
     });
@@ -115,11 +123,20 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       return;
     }
 
+    // Dispatch export start event
+    if (asDownload) {
+      window.dispatchEvent(new CustomEvent('export-start'));
+    }
+
     try {
-      // Create a copy of the ArrayBuffer to prevent detachment
-      const bufferCopy = state.currentDocument.file.slice(0);
+      // Create a fresh copy of the ArrayBuffer to prevent detachment
+      const originalBuffer = state.currentDocument.file;
+      const bufferCopy = originalBuffer.slice(0);
       const pdfDoc = await PDFDocument.load(bufferCopy);
       const pages = pdfDoc.getPages();
+
+      // Embed a standard font for text rendering
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
       // Process signatures
       for (const sig of state.signatures) {
@@ -142,11 +159,12 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
               signatureImage = await pdfDoc.embedJpg(imageBytes);
             }
           
-            // Convert from screen coordinates to PDF coordinates
-            const pdfX = sig.position.x * (width / 595);
-            const pdfY = height - (sig.position.y * (height / 842)) - (sig.size.height * (height / 842));
-            const pdfWidth = sig.size.width * (width / 595);
-            const pdfHeight = sig.size.height * (height / 842);
+            // Convert from screen coordinates to PDF coordinates (scale 1.2 is used in viewer)
+            const scale = 1.2;
+            const pdfX = (sig.position.x / scale) * (width / 595);
+            const pdfY = height - ((sig.position.y / scale) * (height / 842)) - ((sig.size.height / scale) * (height / 842));
+            const pdfWidth = (sig.size.width / scale) * (width / 595);
+            const pdfHeight = (sig.size.height / scale) * (height / 842);
             
             page.drawImage(signatureImage, {
               x: pdfX,
@@ -159,15 +177,23 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           }
         } else if (sig.type === 'text' && sig.text) {
           // For text signatures, add text
-          const fontSize = (sig.textStyle?.fontSize || 32) * (width / 595);
-          const pdfX = sig.position.x * (width / 595);
-          const pdfY = height - (sig.position.y * (height / 842));
+          const scale = 1.2;
+          const fontSize = ((sig.textStyle?.fontSize || 32) / scale) * (width / 595);
+          const pdfX = (sig.position.x / scale) * (width / 595);
+          const pdfY = height - ((sig.position.y / scale) * (height / 842));
+          
+          // Parse color from hex to RGB
+          const hexColor = sig.textStyle?.color || '#000000';
+          const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+          const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+          const b = parseInt(hexColor.slice(5, 7), 16) / 255;
           
           page.drawText(sig.text, {
             x: pdfX,
             y: pdfY,
             size: fontSize,
-            color: rgb(0, 0, 0),
+            color: rgb(r, g, b),
+            font: font,
           });
         }
       }
@@ -191,11 +217,12 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             embedImage = await pdfDoc.embedJpg(imageBytes);
           }
           
-          // Convert from screen coordinates to PDF coordinates
-          const pdfX = img.position.x * (width / 595);
-          const pdfY = height - (img.position.y * (height / 842)) - (img.size.height * (height / 842));
-          const pdfWidth = img.size.width * (width / 595);
-          const pdfHeight = img.size.height * (height / 842);
+          // Convert from screen coordinates to PDF coordinates (scale 1.2 is used in viewer)
+          const scale = 1.2;
+          const pdfX = (img.position.x / scale) * (width / 595);
+          const pdfY = height - ((img.position.y / scale) * (height / 842)) - ((img.size.height / scale) * (height / 842));
+          const pdfWidth = (img.size.width / scale) * (width / 595);
+          const pdfHeight = (img.size.height / scale) * (height / 842);
           
           page.drawImage(embedImage, {
             x: pdfX,
@@ -214,9 +241,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           // Apply to all pages
           pages.forEach((page, index) => {
             const { width, height } = page.getSize();
-            const fontSize = (pageNum.fontSize || 12) * (width / 595);
-            const pdfX = pageNum.position.x * (width / 595);
-            const pdfY = height - (pageNum.position.y * (height / 842));
+            const scale = 1.2;
+            const fontSize = ((pageNum.fontSize || 12) / scale) * (width / 595);
+            const pdfX = (pageNum.position.x / scale) * (width / 595);
+            const pdfY = height - ((pageNum.position.y / scale) * (height / 842));
             
             const text = pageNum.template
               .replace('{page}', (index + pageNum.startingNumber).toString())
@@ -227,6 +255,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
               y: pdfY,
               size: fontSize,
               color: rgb(0, 0, 0),
+              font: font,
             });
           });
         } else {
@@ -235,9 +264,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           if (pageIndex >= 0 && pageIndex < pages.length) {
             const page = pages[pageIndex];
             const { width, height } = page.getSize();
-            const fontSize = (pageNum.fontSize || 12) * (width / 595);
-            const pdfX = pageNum.position.x * (width / 595);
-            const pdfY = height - (pageNum.position.y * (height / 842));
+            const scale = 1.2;
+            const fontSize = ((pageNum.fontSize || 12) / scale) * (width / 595);
+            const pdfX = (pageNum.position.x / scale) * (width / 595);
+            const pdfY = height - ((pageNum.position.y / scale) * (height / 842));
             
             const text = pageNum.template
               .replace('{page}', (pageNum.page + pageNum.startingNumber - 1).toString())
@@ -248,6 +278,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
               y: pdfY,
               size: fontSize,
               color: rgb(0, 0, 0),
+              font: font,
             });
           }
         }
@@ -260,8 +291,10 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
         downloadFile(pdfBytes, state.currentDocument.name);
         showToast('PDF exported successfully!', 'success');
       } else {
-        // Create a new ArrayBuffer to prevent detachment issues
-        const newBuffer = pdfBytes.buffer.slice(0);
+        // Update the current document with the saved PDF
+        const newBuffer = new ArrayBuffer(pdfBytes.length);
+        const newView = new Uint8Array(newBuffer);
+        newView.set(pdfBytes);
         
         // Clear the elements from the store since they're now embedded in the PDF
         set({
@@ -269,15 +302,18 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             ...state.currentDocument,
             file: newBuffer,
           },
-          signatures: [],
-          images: [],
-          pageNumbers: [],
         });
+        get().saveToHistory();
         showToast('PDF saved successfully!', 'success');
       }
     } catch (error) {
       console.error('Error saving PDF:', error);
       showToast('Error saving PDF', 'error');
+    } finally {
+      // Dispatch export end event
+      if (asDownload) {
+        window.dispatchEvent(new CustomEvent('export-end'));
+      }
     }
   },
 
@@ -353,37 +389,220 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     });
   },
 
-  deletePage: (pageIndex) => {
+  deletePage: async (pageIndex) => {
     const state = get();
-    state.saveToHistory();
-    
-    const newTotalPages = Math.max(1, state.totalPages - 1);
-    let newCurrentPage = state.currentPage;
-    
-    if (pageIndex === state.currentPage) {
-      newCurrentPage = pageIndex > 1 ? pageIndex - 1 : 1;
-    } else if (pageIndex < state.currentPage) {
-      newCurrentPage = state.currentPage - 1;
+    if (!state.currentDocument || state.totalPages <= 1) {
+      showToast('Cannot delete the only remaining page', 'error');
+      return;
     }
-    
-    set({
-      totalPages: newTotalPages,
-      currentPage: newCurrentPage
-    });
-    
-    showToast(`Page ${pageIndex} deleted`, 'success');
+
+    // Show progress for large documents
+    if (state.totalPages > 50) {
+      showToast('Deleting page from large document...', 'info');
+    }
+
+    state.saveToHistory();
+
+    try {
+      // Load the PDF document
+      const bufferCopy = state.currentDocument.file.slice(0);
+      const pdfDoc = await PDFDocument.load(bufferCopy);
+      
+      // Remove the page (pageIndex is 1-based, but removePage expects 0-based)
+      pdfDoc.removePage(pageIndex - 1);
+      
+      // Save the modified PDF
+      const pdfBytes = await pdfDoc.save();
+      const newBuffer = new ArrayBuffer(pdfBytes.length);
+      const newView = new Uint8Array(newBuffer);
+      newView.set(pdfBytes);
+      
+      const newTotalPages = pdfDoc.getPageCount();
+      let newCurrentPage = state.currentPage;
+      
+      // Adjust current page if necessary
+      if (pageIndex === state.currentPage) {
+        newCurrentPage = pageIndex > 1 ? pageIndex - 1 : 1;
+      } else if (pageIndex < state.currentPage) {
+        newCurrentPage = state.currentPage - 1;
+      }
+      
+      // Update the document and state
+      set({
+        currentDocument: {
+          ...state.currentDocument,
+          file: newBuffer,
+        },
+        totalPages: newTotalPages,
+        currentPage: Math.min(newCurrentPage, newTotalPages),
+        documentKey: get().documentKey + 1,
+        // Remove elements that were on the deleted page
+        signatures: state.signatures.filter(sig => sig.page !== pageIndex).map(sig => ({
+          ...sig,
+          page: sig.page > pageIndex ? sig.page - 1 : sig.page
+        })),
+        images: state.images.filter(img => img.page !== pageIndex).map(img => ({
+          ...img,
+          page: img.page > pageIndex ? img.page - 1 : img.page
+        })),
+        pageNumbers: state.pageNumbers.filter(num => num.page !== pageIndex && num.page !== 0).map(num => ({
+          ...num,
+          page: num.page > pageIndex ? num.page - 1 : num.page
+        }))
+      });
+      
+      showToast(`Page ${pageIndex} deleted successfully`, 'success');
+    } catch (error) {
+      console.error('Error deleting page:', error);
+      showToast('Error deleting page', 'error');
+    }
   },
 
-  addPage: (afterPageIndex) => {
+  addPage: async (afterPageIndex) => {
     const state = get();
-    state.saveToHistory();
-    
-    set({
-      totalPages: state.totalPages + 1,
-      currentPage: afterPageIndex + 1
-    });
-    
-    showToast('New page added', 'success');
+    if (!state.currentDocument) {
+      showToast('No document loaded', 'error');
+      return;
+    }
+
+    // Show progress for large documents
+    if (state.totalPages > 50) {
+      showToast('Adding page to large document...', 'info');
+    }
+
+    try {
+      // Save to history before making changes
+      get().saveToHistory();
+
+      // Load the PDF document
+      const currentState = get();
+      const originalBuffer = currentState.currentDocument?.file;
+      if (!originalBuffer || originalBuffer.byteLength === 0) {
+        throw new Error('Document buffer is empty or invalid');
+      }
+      
+      const bufferCopy = originalBuffer.slice(0);
+      const pdfDoc = await PDFDocument.load(bufferCopy);
+      
+      // Add a new blank page after the specified index
+      const newPage = pdfDoc.insertPage(afterPageIndex);
+      
+      // Set standard A4 size (595.28 x 841.89 points)
+      newPage.setSize(595.28, 841.89);
+      
+      // Save the modified PDF
+      const pdfBytes = await pdfDoc.save();
+      const newBuffer = new ArrayBuffer(pdfBytes.length);
+      const newView = new Uint8Array(newBuffer);
+      newView.set(pdfBytes);
+      
+      const newTotalPages = pdfDoc.getPageCount();
+      
+      // Update the document and state
+      set({
+        currentDocument: state.currentDocument ? {
+          ...state.currentDocument,
+          file: newBuffer,
+        } : null,
+        totalPages: newTotalPages,
+        currentPage: afterPageIndex + 1,
+        documentKey: get().documentKey + 1,
+        // Update page numbers for elements that come after the inserted page
+        signatures: state.signatures.map(sig => ({
+          ...sig,
+          page: sig.page > afterPageIndex ? sig.page + 1 : sig.page
+        })),
+        images: state.images.map(img => ({
+          ...img,
+          page: img.page > afterPageIndex ? img.page + 1 : img.page
+        })),
+        pageNumbers: state.pageNumbers.map(num => ({
+          ...num,
+          page: num.page > afterPageIndex && num.page !== 0 ? num.page + 1 : num.page
+        }))
+      });
+      
+      showToast('New page added successfully', 'success');
+    } catch (error) {
+      console.error('Error adding page:', error);
+      showToast(`Error adding page: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      
+      // Don't restore state on error to prevent document loss
+      // Just log the error and let the user try again
+    }
+  },
+
+  addPagesFromPDF: async (pdfBuffer, afterPageIndex) => {
+    const state = get();
+    if (!state.currentDocument) {
+      showToast('No document loaded', 'error');
+      return;
+    }
+
+    showToast('Importing PDF pages...', 'info');
+
+    try {
+      // Save to history before making changes
+      get().saveToHistory();
+
+      // Load both the current document and the PDF to import
+      const originalBuffer = state.currentDocument.file;
+      if (!originalBuffer || originalBuffer.byteLength === 0) {
+        throw new Error('Document buffer is empty or invalid');
+      }
+      
+      const bufferCopy = originalBuffer.slice(0);
+      const currentPdfDoc = await PDFDocument.load(bufferCopy);
+      const importPdfDoc = await PDFDocument.load(pdfBuffer);
+      
+      // Get all pages from the import PDF
+      const importPages = await currentPdfDoc.copyPages(importPdfDoc, importPdfDoc.getPageIndices());
+      
+      // Insert all pages after the specified index
+      let insertIndex = afterPageIndex;
+      for (const page of importPages) {
+        currentPdfDoc.insertPage(insertIndex, page);
+        insertIndex++;
+      }
+      
+      // Save the modified PDF
+      const pdfBytes = await currentPdfDoc.save();
+      const newBuffer = new ArrayBuffer(pdfBytes.length);
+      const newView = new Uint8Array(newBuffer);
+      newView.set(pdfBytes);
+      
+      const newTotalPages = currentPdfDoc.getPageCount();
+      const pagesAdded = importPages.length;
+      
+      // Update the document and state
+      set({
+        currentDocument: {
+          ...state.currentDocument!,
+          file: newBuffer,
+        },
+        totalPages: newTotalPages,
+        currentPage: afterPageIndex + 1,
+        documentKey: get().documentKey + 1,
+        // Update page numbers for elements that come after the inserted pages
+        signatures: state.signatures.map(sig => ({
+          ...sig,
+          page: sig.page > afterPageIndex ? sig.page + pagesAdded : sig.page
+        })),
+        images: state.images.map(img => ({
+          ...img,
+          page: img.page > afterPageIndex ? img.page + pagesAdded : img.page
+        })),
+        pageNumbers: state.pageNumbers.map(num => ({
+          ...num,
+          page: num.page > afterPageIndex && num.page !== 0 ? num.page + pagesAdded : num.page
+        }))
+      });
+      
+      showToast(`Successfully imported ${pagesAdded} page(s) from PDF`, 'success');
+    } catch (error) {
+      console.error('Error importing PDF pages:', error);
+      showToast(`Error importing PDF: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   },
 
   reorderPages: (fromIndex, toIndex) => {
@@ -419,6 +638,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     const previousState = state.history[state.currentHistoryIndex - 1];
     
     set({
+      currentDocument: previousState.currentDocument,
       signatures: previousState.signatures,
       images: previousState.images,
       pageNumbers: previousState.pageNumbers,
@@ -436,6 +656,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     const nextState = state.history[state.currentHistoryIndex + 1];
     
     set({
+      currentDocument: nextState.currentDocument,
       signatures: nextState.signatures,
       images: nextState.images,
       pageNumbers: nextState.pageNumbers,
@@ -448,14 +669,36 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
 
   saveToHistory: function() {
     const state = get();
-    const newHistoryEntry = createStateSnapshot(state);
-    const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-    newHistory.push(newHistoryEntry);
-    
+    try {
+      const newHistoryEntry = createStateSnapshot(state);
+      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
+      
+      // Limit history size to prevent memory issues
+      const maxHistorySize = 50;
+      if (newHistory.length >= maxHistorySize) {
+        newHistory.shift(); // Remove oldest entry
+      }
+      
+      newHistory.push(newHistoryEntry);
+      
+      set({
+        history: newHistory,
+        currentHistoryIndex: newHistory.length - 1,
+        canUndo: newHistory.length > 1,
+        canRedo: false
+      });
+    } catch (error) {
+      console.error('Error saving to history:', error);
+      // Don't throw error to prevent breaking the main functionality
+    }
+  },
+
+  // Helper method to safely save to history
+  clearHistory: () => {
     set({
-      history: newHistory,
-      currentHistoryIndex: newHistory.length - 1,
-      canUndo: newHistory.length > 1,
+      history: [],
+      currentHistoryIndex: -1,
+      canUndo: false,
       canRedo: false
     });
   }
