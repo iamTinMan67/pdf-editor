@@ -88,20 +88,20 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     // Create a new ArrayBuffer copy to prevent detachment issues
     const newBuffer = file.slice(0);
     
-         set({
-       currentDocument: { name, file: newBuffer },
-       signatures: [],
-       images: [],
-       pageNumbers: [],
-       history: [],
-       currentHistoryIndex: -1,
-       totalPages: 1, // Will be updated after loading
-       currentPage: 1,
-       documentKey: get().documentKey + 1,
-       processedElements: new Set<string>(),
-       canUndo: false,
-       canRedo: false
-     });
+               set({
+        currentDocument: { name, file: newBuffer },
+        signatures: [],
+        images: [],
+        pageNumbers: [],
+        history: [],
+        currentHistoryIndex: -1,
+        totalPages: 1, // Will be updated after loading
+        currentPage: 1,
+        documentKey: get().documentKey + 1,
+        processedElements: new Set<string>(),
+        canUndo: false,
+        canRedo: false
+      });
     
     // Get the actual number of pages from the PDF
     (async () => {
@@ -362,12 +362,16 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           const newView = new Uint8Array(newBuffer);
           newView.set(pdfBytes);
           
-          // Update the document but keep signatures editable
+          // Clear the signatures from the store since they're now embedded in the PDF
+          // This prevents duplicates and keeps the PDF clean
           set({
             currentDocument: {
               ...state.currentDocument,
               file: newBuffer,
             },
+            signatures: [],
+            images: [],
+            pageNumbers: [],
           });
           get().saveToHistory();
           showToast('PDF saved successfully!', 'success');
