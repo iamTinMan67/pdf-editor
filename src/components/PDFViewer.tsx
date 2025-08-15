@@ -18,7 +18,7 @@ interface PDFViewerProps {
 }
 
 const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel, isExporting = false }) => {
-  const { currentDocument, signatures, images, pageNumbers, currentPage, setCurrentPage, totalPages, documentKey } = useDocumentStore();
+  const { currentDocument, signatures, images, pageNumbers, currentPage, setCurrentPage, totalPages, documentKey, processedElements } = useDocumentStore();
   const [numPages, setNumPages] = useState<number | null>(null);
   const [scale, setScale] = useState<number>(1.2);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
@@ -77,11 +77,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel, isExporting = fa
     setScale((prev) => Math.max(prev - 0.2, 0.6));
   };
 
-  // Elements that belong to the current page
-  const currentSignatures = signatures.filter(sig => sig.page === currentPage);
-  const currentImages = images.filter(img => img.page === currentPage);
+  // Elements that belong to the current page and haven't been processed yet
+  const currentSignatures = signatures.filter(sig => sig.page === currentPage && !processedElements.has(sig.id));
+  const currentImages = images.filter(img => img.page === currentPage && !processedElements.has(img.id));
   // Page numbers with page 0 appear on all pages, others only on their specific page
-  const currentPageNumbers = pageNumbers.filter(num => num.page === 0 || num.page === currentPage);
+  const currentPageNumbers = pageNumbers.filter(num => (num.page === 0 || num.page === currentPage) && !processedElements.has(num.id));
 
   // Center the page initially
   useEffect(() => {
