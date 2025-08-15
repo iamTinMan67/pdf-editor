@@ -239,23 +239,13 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
               .replace('{page}', (index + pageNum.startingNumber).toString())
               .replace('{total}', state.totalPages.toString());
             
-            // Only add page number if it doesn't already exist at this position
-            const pageIndex = index + 1;
-            const existingPageNumber = state.pageNumbers.find(pn => 
-              pn.page === pageIndex && 
-              Math.abs(pn.position.x - pageNum.position.x) < 10 && 
-              Math.abs(pn.position.y - pageNum.position.y) < 10
-            );
-            
-            if (!existingPageNumber) {
-              page.drawText(text, {
-                x: pdfX,
-                y: pdfY,
-                size: fontSize,
-                color: rgb(0, 0, 0),
-                font: font,
-              });
-            }
+            page.drawText(text, {
+              x: pdfX,
+              y: pdfY,
+              size: fontSize,
+              color: rgb(0, 0, 0),
+              font: font,
+            });
           });
         } else {
           // Apply to specific page
@@ -663,24 +653,16 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
 
   saveToHistory: function() {
     const state = get();
-    const newHistoryEntry = createStateSnapshot(state);
-    const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-    newHistory.push(newHistoryEntry);
-    
-    set({
-      history: newHistory,
-      currentHistoryIndex: newHistory.length - 1,
-      canUndo: newHistory.length > 1,
-      canRedo: false
-    });
-  },
-
-  // Helper method to safely save to history
-  _saveToHistory: () => {
-    const state = get();
     try {
       const newHistoryEntry = createStateSnapshot(state);
       const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
+      
+      // Limit history size to prevent memory issues
+      const maxHistorySize = 50;
+      if (newHistory.length >= maxHistorySize) {
+        newHistory.shift(); // Remove oldest entry
+      }
+      
       newHistory.push(newHistoryEntry);
       
       set({
@@ -691,6 +673,17 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       });
     } catch (error) {
       console.error('Error saving to history:', error);
+      // Don't throw error to prevent breaking the main functionality
     }
+  },
+
+  // Helper method to safely save to history
+  clearHistory: () => {
+    set({
+      history: [],
+      currentHistoryIndex: -1,
+      canUndo: false,
+      canRedo: false
+    });
   }
 }));
