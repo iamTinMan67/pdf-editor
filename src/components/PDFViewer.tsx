@@ -14,9 +14,10 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 interface PDFViewerProps {
   activeToolPanel: string | null;
+  isExporting?: boolean;
 }
 
-const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
+const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel, isExporting = false }) => {
   const { currentDocument, signatures, images, pageNumbers, currentPage, setCurrentPage, totalPages, documentKey } = useDocumentStore();
   const [numPages, setNumPages] = useState<number | null>(null);
   const [scale, setScale] = useState<number>(1.2);
@@ -170,7 +171,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
                 />
                 
                 {/* Overlays for editing elements */}
-                <div className="absolute inset-0 pointer-events-none">
+                {!isExporting && (
+                  <div className="absolute inset-0 pointer-events-none">
                   {/* Render signatures */}
                   {currentSignatures.map((sig) => (
                     <Signature
@@ -199,7 +201,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ activeToolPanel }) => {
                       editable={activeToolPanel === 'pageNumber'}
                     />
                   ))}
-                </div>
+                  </div>
+                )}
               </div>
             </Document>
           ) : (

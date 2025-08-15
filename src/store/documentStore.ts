@@ -123,6 +123,11 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       return;
     }
 
+    // Dispatch export start event
+    if (asDownload) {
+      window.dispatchEvent(new CustomEvent('export-start'));
+    }
+
     try {
       // Create a fresh copy of the ArrayBuffer to prevent detachment
       const originalBuffer = state.currentDocument.file;
@@ -177,11 +182,17 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           const pdfX = (sig.position.x / scale) * (width / 595);
           const pdfY = height - ((sig.position.y / scale) * (height / 842));
           
+          // Parse color from hex to RGB
+          const hexColor = sig.textStyle?.color || '#000000';
+          const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+          const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+          const b = parseInt(hexColor.slice(5, 7), 16) / 255;
+          
           page.drawText(sig.text, {
             x: pdfX,
             y: pdfY,
             size: fontSize,
-            color: rgb(0, 0, 0),
+            color: rgb(r, g, b),
             font: font,
           });
         }
@@ -298,6 +309,11 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     } catch (error) {
       console.error('Error saving PDF:', error);
       showToast('Error saving PDF', 'error');
+    } finally {
+      // Dispatch export end event
+      if (asDownload) {
+        window.dispatchEvent(new CustomEvent('export-end'));
+      }
     }
   },
 
