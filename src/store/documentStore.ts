@@ -18,6 +18,7 @@ interface DocumentStoreState {
   totalPages: number;
   currentPage: number;
   documentKey: number;
+  processedElements: Set<string>; // Track which elements have been processed
 }
 
 interface DocumentStoreActions {
@@ -79,6 +80,7 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
   totalPages: 0,
   currentPage: 1,
   documentKey: 0,
+  processedElements: new Set<string>(),
   canUndo: false,
   canRedo: false,
 
@@ -86,19 +88,20 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
     // Create a new ArrayBuffer copy to prevent detachment issues
     const newBuffer = file.slice(0);
     
-    set({
-      currentDocument: { name, file: newBuffer },
-      signatures: [],
-      images: [],
-      pageNumbers: [],
-      history: [],
-      currentHistoryIndex: -1,
-      totalPages: 1, // Will be updated after loading
-      currentPage: 1,
-      documentKey: get().documentKey + 1,
-      canUndo: false,
-      canRedo: false
-    });
+         set({
+       currentDocument: { name, file: newBuffer },
+       signatures: [],
+       images: [],
+       pageNumbers: [],
+       history: [],
+       currentHistoryIndex: -1,
+       totalPages: 1, // Will be updated after loading
+       currentPage: 1,
+       documentKey: get().documentKey + 1,
+       processedElements: new Set<string>(),
+       canUndo: false,
+       canRedo: false
+     });
     
     // Get the actual number of pages from the PDF
     (async () => {
@@ -138,13 +141,16 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       // Embed a standard font for text rendering
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-      // Process signatures
-      for (const sig of state.signatures) {
-        const pageIndex = sig.page - 1;
-        if (pageIndex < 0 || pageIndex >= pages.length) continue;
-        
-        const page = pages[pageIndex];
-        const { width, height } = page.getSize();
+             // Process signatures
+       for (const sig of state.signatures) {
+         // Skip if already processed
+         if (state.processedElements.has(sig.id)) continue;
+         
+         const pageIndex = sig.page - 1;
+         if (pageIndex < 0 || pageIndex >= pages.length) continue;
+         
+         const page = pages[pageIndex];
+         const { width, height } = page.getSize();
 
         if (sig.type === 'drawn' && sig.dataURL) {
           // For drawn signatures, embed the image
@@ -166,15 +172,20 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
             const pdfWidth = (sig.size.width / scale) * (width / 595);
             const pdfHeight = (sig.size.height / scale) * (height / 842);
             
-            page.drawImage(signatureImage, {
-              x: pdfX,
-              y: pdfY,
-              width: pdfWidth,
-              height: pdfHeight,
-            });
-          } catch (error) {
-            console.error('Error embedding signature image:', error);
-          }
+                         page.drawImage(signatureImage, {
+               x: pdfX,
+               y: pdfY,
+               width: pdfWidth,
+               height: pdfHeight,
+             });
+             
+             // Mark as processed
+             set(state => ({
+               processedElements: new Set([...state.processedElements, sig.id])
+             }));
+           } catch (error) {
+             console.error('Error embedding signature image:', error);
+           }
         } else if (sig.type === 'text' && sig.text) {
           // For text signatures, add text
           const scale = 1.2;
@@ -188,23 +199,31 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           const g = parseInt(hexColor.slice(3, 5), 16) / 255;
           const b = parseInt(hexColor.slice(5, 7), 16) / 255;
           
-          page.drawText(sig.text, {
-            x: pdfX,
-            y: pdfY,
-            size: fontSize,
-            color: rgb(r, g, b),
-            font: font,
-          });
+                     page.drawText(sig.text, {
+             x: pdfX,
+             y: pdfY,
+             size: fontSize,
+             color: rgb(r, g, b),
+             font: font,
+           });
+           
+           // Mark as processed
+           set(state => ({
+             processedElements: new Set([...state.processedElements, sig.id])
+           }));
         }
       }
 
-      // Process images
-      for (const img of state.images) {
-        const pageIndex = img.page - 1;
-        if (pageIndex < 0 || pageIndex >= pages.length) continue;
-        
-        const page = pages[pageIndex];
-        const { width, height } = page.getSize();
+             // Process images
+       for (const img of state.images) {
+         // Skip if already processed
+         if (state.processedElements.has(img.id)) continue;
+         
+         const pageIndex = img.page - 1;
+         if (pageIndex < 0 || pageIndex >= pages.length) continue;
+         
+         const page = pages[pageIndex];
+         const { width, height } = page.getSize();
         
         try {
           const imageData = img.dataURL.split(',')[1];
@@ -224,15 +243,20 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           const pdfWidth = (img.size.width / scale) * (width / 595);
           const pdfHeight = (img.size.height / scale) * (height / 842);
           
-          page.drawImage(embedImage, {
-            x: pdfX,
-            y: pdfY,
-            width: pdfWidth,
-            height: pdfHeight,
-          });
-        } catch (error) {
-          console.error('Error embedding image:', error);
-        }
+                     page.drawImage(embedImage, {
+             x: pdfX,
+             y: pdfY,
+             width: pdfWidth,
+             height: pdfHeight,
+           });
+           
+           // Mark as processed
+           set(state => ({
+             processedElements: new Set([...state.processedElements, img.id])
+           }));
+         } catch (error) {
+           console.error('Error embedding image:', error);
+         }
       }
 
       // Process page numbers
@@ -296,15 +320,12 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
          const newView = new Uint8Array(newBuffer);
          newView.set(pdfBytes);
          
-         // Clear the elements from the store since they're now embedded in the PDF
+         // Update the document but keep the elements in the store for further editing
          set({
            currentDocument: {
              ...state.currentDocument,
              file: newBuffer,
            },
-           signatures: [],
-           images: [],
-           pageNumbers: [],
          });
          get().saveToHistory();
          showToast('PDF saved successfully!', 'success');
