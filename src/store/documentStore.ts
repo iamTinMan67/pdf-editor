@@ -141,7 +141,8 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       // Embed a standard font for text rendering
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-             // Process signatures
+                    // Process signatures
+       const processedSignatureIds = new Set<string>();
        for (const sig of state.signatures) {
          // Skip if already processed
          if (state.processedElements.has(sig.id)) continue;
@@ -152,27 +153,27 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
          const page = pages[pageIndex];
          const { width, height } = page.getSize();
 
-        if (sig.type === 'drawn' && sig.dataURL) {
-          // For drawn signatures, embed the image
-          try {
-            const imageData = sig.dataURL.split(',')[1];
-            const imageBytes = Uint8Array.from(atob(imageData), c => c.charCodeAt(0));
-            
-            let signatureImage;
-            if (sig.dataURL.startsWith('data:image/png')) {
-              signatureImage = await pdfDoc.embedPng(imageBytes);
-            } else {
-              signatureImage = await pdfDoc.embedJpg(imageBytes);
-            }
-          
-            // Convert from screen coordinates to PDF coordinates (scale 1.2 is used in viewer)
-            const scale = 1.2;
-            const pdfX = (sig.position.x / scale) * (width / 595);
-            const pdfY = height - ((sig.position.y / scale) * (height / 842)) - ((sig.size.height / scale) * (height / 842));
-            const pdfWidth = (sig.size.width / scale) * (width / 595);
-            const pdfHeight = (sig.size.height / scale) * (height / 842);
-            
-                         page.drawImage(signatureImage, {
+         if (sig.type === 'drawn' && sig.dataURL) {
+           // For drawn signatures, embed the image
+           try {
+             const imageData = sig.dataURL.split(',')[1];
+             const imageBytes = Uint8Array.from(atob(imageData), c => c.charCodeAt(0));
+             
+             let signatureImage;
+             if (sig.dataURL.startsWith('data:image/png')) {
+               signatureImage = await pdfDoc.embedPng(imageBytes);
+             } else {
+               signatureImage = await pdfDoc.embedJpg(imageBytes);
+             }
+           
+             // Convert from screen coordinates to PDF coordinates (scale 1.2 is used in viewer)
+             const scale = 1.2;
+             const pdfX = (sig.position.x / scale) * (width / 595);
+             const pdfY = height - ((sig.position.y / scale) * (height / 842)) - ((sig.size.height / scale) * (height / 842));
+             const pdfWidth = (sig.size.width / scale) * (width / 595);
+             const pdfHeight = (sig.size.height / scale) * (height / 842);
+             
+             page.drawImage(signatureImage, {
                x: pdfX,
                y: pdfY,
                width: pdfWidth,
@@ -180,26 +181,24 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
              });
              
              // Mark as processed
-             set(state => ({
-               processedElements: new Set([...state.processedElements, sig.id])
-             }));
+             processedSignatureIds.add(sig.id);
            } catch (error) {
              console.error('Error embedding signature image:', error);
            }
-        } else if (sig.type === 'text' && sig.text) {
-          // For text signatures, add text
-          const scale = 1.2;
-          const fontSize = ((sig.textStyle?.fontSize || 32) / scale) * (width / 595);
-          const pdfX = (sig.position.x / scale) * (width / 595);
-          const pdfY = height - ((sig.position.y / scale) * (height / 842));
-          
-          // Parse color from hex to RGB
-          const hexColor = sig.textStyle?.color || '#000000';
-          const r = parseInt(hexColor.slice(1, 3), 16) / 255;
-          const g = parseInt(hexColor.slice(3, 5), 16) / 255;
-          const b = parseInt(hexColor.slice(5, 7), 16) / 255;
-          
-                     page.drawText(sig.text, {
+         } else if (sig.type === 'text' && sig.text) {
+           // For text signatures, add text
+           const scale = 1.2;
+           const fontSize = ((sig.textStyle?.fontSize || 32) / scale) * (width / 595);
+           const pdfX = (sig.position.x / scale) * (width / 595);
+           const pdfY = height - ((sig.position.y / scale) * (height / 842));
+           
+           // Parse color from hex to RGB
+           const hexColor = sig.textStyle?.color || '#000000';
+           const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+           const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+           const b = parseInt(hexColor.slice(5, 7), 16) / 255;
+           
+           page.drawText(sig.text, {
              x: pdfX,
              y: pdfY,
              size: fontSize,
@@ -208,13 +207,12 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
            });
            
            // Mark as processed
-           set(state => ({
-             processedElements: new Set([...state.processedElements, sig.id])
-           }));
-        }
-      }
+           processedSignatureIds.add(sig.id);
+         }
+       }
 
-             // Process images
+                    // Process images
+       const processedImageIds = new Set<string>();
        for (const img of state.images) {
          // Skip if already processed
          if (state.processedElements.has(img.id)) continue;
@@ -243,20 +241,18 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
           const pdfWidth = (img.size.width / scale) * (width / 595);
           const pdfHeight = (img.size.height / scale) * (height / 842);
           
-                     page.drawImage(embedImage, {
-             x: pdfX,
-             y: pdfY,
-             width: pdfWidth,
-             height: pdfHeight,
-           });
-           
-           // Mark as processed
-           set(state => ({
-             processedElements: new Set([...state.processedElements, img.id])
-           }));
-         } catch (error) {
-           console.error('Error embedding image:', error);
-         }
+          page.drawImage(embedImage, {
+            x: pdfX,
+            y: pdfY,
+            width: pdfWidth,
+            height: pdfHeight,
+          });
+          
+          // Mark as processed
+          processedImageIds.add(img.id);
+        } catch (error) {
+          console.error('Error embedding image:', error);
+        }
       }
 
       // Process page numbers
@@ -308,24 +304,32 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
         }
       }
 
-      // Save the PDF
-      const pdfBytes = await pdfDoc.save();
-      
-      if (asDownload) {
-        downloadFile(pdfBytes, state.currentDocument.name);
-        showToast('PDF exported successfully!', 'success');
-             } else {
+             // Save the PDF
+       const pdfBytes = await pdfDoc.save();
+       
+       // Update processed elements after successful save
+       const newProcessedElements = new Set([
+         ...state.processedElements,
+         ...processedSignatureIds,
+         ...processedImageIds
+       ]);
+       
+       if (asDownload) {
+         downloadFile(pdfBytes, state.currentDocument.name);
+         showToast('PDF exported successfully!', 'success');
+       } else {
          // Update the current document with the saved PDF
          const newBuffer = new ArrayBuffer(pdfBytes.length);
          const newView = new Uint8Array(newBuffer);
          newView.set(pdfBytes);
          
-         // Update the document but keep the elements in the store for further editing
+         // Update the document and processed elements
          set({
            currentDocument: {
              ...state.currentDocument,
              file: newBuffer,
            },
+           processedElements: newProcessedElements,
          });
          get().saveToHistory();
          showToast('PDF saved successfully!', 'success');
