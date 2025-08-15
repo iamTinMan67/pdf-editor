@@ -290,22 +290,25 @@ export const useDocumentStore = create<DocumentStoreState & DocumentStoreActions
       if (asDownload) {
         downloadFile(pdfBytes, state.currentDocument.name);
         showToast('PDF exported successfully!', 'success');
-      } else {
-        // Update the current document with the saved PDF
-        const newBuffer = new ArrayBuffer(pdfBytes.length);
-        const newView = new Uint8Array(newBuffer);
-        newView.set(pdfBytes);
-        
-        // Clear the elements from the store since they're now embedded in the PDF
-        set({
-          currentDocument: {
-            ...state.currentDocument,
-            file: newBuffer,
-          },
-        });
-        get().saveToHistory();
-        showToast('PDF saved successfully!', 'success');
-      }
+             } else {
+         // Update the current document with the saved PDF
+         const newBuffer = new ArrayBuffer(pdfBytes.length);
+         const newView = new Uint8Array(newBuffer);
+         newView.set(pdfBytes);
+         
+         // Clear the elements from the store since they're now embedded in the PDF
+         set({
+           currentDocument: {
+             ...state.currentDocument,
+             file: newBuffer,
+           },
+           signatures: [],
+           images: [],
+           pageNumbers: [],
+         });
+         get().saveToHistory();
+         showToast('PDF saved successfully!', 'success');
+       }
     } catch (error) {
       console.error('Error saving PDF:', error);
       showToast('Error saving PDF', 'error');
